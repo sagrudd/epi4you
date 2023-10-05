@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 mod epi2me_db;
 mod json;
+mod app_db;
 
 /// Trivial application to package EPI2ME workflows and analysis results
 #[derive(Parser)]
@@ -42,6 +43,6 @@ fn main() {
     let _args = Args::parse();
     let db_path = epi2me_db::find_db();
     if db_path.is_some() {
-        
+        let _ = app_db::load_db(db_path.unwrap());
     }
 }
