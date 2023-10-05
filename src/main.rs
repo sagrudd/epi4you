@@ -1,4 +1,6 @@
 use clap::{Parser, Subcommand};
+mod epi2me_db;
+mod json;
 
 /// Trivial application to package EPI2ME workflows and analysis results
 #[derive(Parser)]
@@ -38,5 +40,8 @@ enum Datatypes {
 
 fn main() {
     let _args = Args::parse();
-    println!("Hello, world!");
+    let db_path = epi2me_db::find_db();
+    if db_path.is_some() {
+        
+    }
 }
