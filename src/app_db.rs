@@ -1,7 +1,9 @@
 use rusqlite::{Connection, Result};
-
+use polars::prelude::*;
+use std::env;
 use std::path::PathBuf;
 
+#[allow(dead_code)]
 #[allow(non_snake_case)]
 #[derive(Debug)]
 struct Epi2MeAnalysis {
@@ -17,7 +19,8 @@ struct Epi2MeAnalysis {
     updatedAt: String,
 }
 
-pub fn load_db(path: PathBuf) -> Result<(), rusqlite::Error> {
+#[allow(non_snake_case)]
+pub fn load_db(path: PathBuf) -> Result<DataFrame, rusqlite::Error> {
 
 
     let lookup = String::from("SELECT id, path, name, status, workflowRepo, workflowUser, workflowCommit, workflowVersion, createdAt, updatedAt FROM bs");
@@ -40,10 +43,56 @@ pub fn load_db(path: PathBuf) -> Result<(), rusqlite::Error> {
         })
     })?;
 
-    for person in analysis_iter {
-        let my_person = person.unwrap();
-        println!("Found analysis result {:?} || {:?}", &my_person.id, &my_person.name);
+    let mut nf_run_vec: Vec<Epi2MeAnalysis> = Vec::new();
+
+    for nextflow_run in analysis_iter {
+        let my_nextflow_run = nextflow_run.unwrap();
+        nf_run_vec.push(my_nextflow_run);
     }
 
-    Ok(())
+    // and wrangle observations into a dataframe
+    let df: DataFrame = struct_to_dataframe!(nf_run_vec, [id,
+        path,
+        name,
+        status,
+        workflowRepo,
+        workflowUser,
+        workflowCommit, workflowVersion, createdAt, updatedAt]).unwrap();
+
+    Ok(df)
 }
+
+
+
+pub fn print_appdb(df: &DataFrame) {
+    env::set_var("POLARS_FMT_TABLE_HIDE_DATAFRAME_SHAPE_INFORMATION", "1");
+    env::set_var("POLARS_FMT_TABLE_HIDE_COLUMN_DATA_TYPES","1");
+    let df2 = df!(
+        "id" => df.column("id").unwrap(),
+        "name" => df.column("name").unwrap(),
+        "workflowRepo" => df.column("workflowRepo").unwrap(),
+        "createdAt" => df.column("createdAt").unwrap(),
+    );
+
+    if df2.is_ok() {
+        println!("{:?}", df2.unwrap());
+    }
+}
+
+
+macro_rules! struct_to_dataframe {
+    ($input:expr, [$($field:ident),+]) => {
+        {
+            // Extract the field values into separate vectors
+            $(let mut $field = Vec::new();)*
+
+            for e in $input.into_iter() {
+                $($field.push(e.$field);)*
+            }
+            df! {
+                $(stringify!($field) => $field,)*
+            }
+        }
+    };
+}
+pub(crate) use struct_to_dataframe;

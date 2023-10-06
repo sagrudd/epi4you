@@ -9,14 +9,6 @@ mod app_db;
 struct Args {
     #[command(subcommand)]
     command: Option<Datatypes>,
-
-    /// Name of the person to greet
-    #[arg(short, long)]
-    name: Option<String>,
-
-    /// Number of times to greet
-    #[arg(short, long, default_value_t = 1)]
-    count: u8,
 }
 
 #[derive(Subcommand)]
@@ -29,13 +21,23 @@ enum Datatypes {
     },
 
     /// bioinformatics workflows
-    BfxFlows {
+    Nextflow {
 
     },
 
-    /// EPI2ME analysis results
-    EpiRes {
+    /// EPI2ME workflow results
+    EPI2ME {
+        /// List analyses run using Desktop Client
+        #[arg(short, long)]
+        list: bool,
 
+        /// List nextflow runs from specified <path>
+        #[arg(short, long)]
+        nf_path: Option<String>,
+
+        /// Export EPI2ME Desktop analysis by ID
+        #[arg(short, long)]
+        export: Option<String>,
     },
 }
 
@@ -43,6 +45,10 @@ fn main() {
     let _args = Args::parse();
     let db_path = epi2me_db::find_db();
     if db_path.is_some() {
-        let _ = app_db::load_db(db_path.unwrap());
+        let df = app_db::load_db(db_path.unwrap());
+        if df.is_ok() {
+            // can we print this?
+            app_db::print_appdb(&df.unwrap());
+        }
     }
 }
