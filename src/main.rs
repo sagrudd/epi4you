@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 mod epi2me_db;
 mod json;
 mod app_db;
+mod nextflow;
 
 /// Trivial application to package EPI2ME workflows and analysis results
 #[derive(Parser)]
@@ -9,6 +10,14 @@ mod app_db;
 struct Args {
     #[command(subcommand)]
     command: Option<Datatypes>,
+
+    /// path to nextflow binary (if not obvious)
+    #[arg(short, long, default_value = None)]
+    nxf_bin: Option<String>,
+
+    /// path to nextflow work folder
+    #[arg(short = 'w', long, default_value = None)]
+    nxf_work: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -43,6 +52,7 @@ enum Datatypes {
 
 fn main() {
     let _args = Args::parse();
+
     let db_path = epi2me_db::find_db();
     if db_path.is_some() {
         let df = app_db::load_db(db_path.unwrap());
@@ -51,4 +61,6 @@ fn main() {
             app_db::print_appdb(&df.unwrap());
         }
     }
+
+    nextflow::parse_nextflow_folder(_args.nxf_work, _args.nxf_bin);
 }
