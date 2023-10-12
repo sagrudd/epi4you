@@ -21,8 +21,11 @@ pub fn get_nextflow_path(nxf_bin: Option<String>) -> Option<String> {
 
     }
 
-    println!("Using nxf_bin found at [{:?}]", &nextflow_bin.clone().unwrap());
-
+    if nextflow_bin.is_some() {
+        println!("Using nxf_bin found at [{:?}]", &nextflow_bin.clone().unwrap());
+    } else {
+        println!("unable to resolve a functional location for nextflow!");
+    }
     return nextflow_bin;
 }
 

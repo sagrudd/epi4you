@@ -62,6 +62,16 @@ pub fn load_db(path: PathBuf) -> Result<DataFrame, rusqlite::Error> {
     Ok(df)
 }
 
+pub fn validate_db_entry(runid: String, polardb: &DataFrame) -> bool {
+    // is runid in name field and unique
+
+    // if this is not unique then list the id options and suggestion to list
+
+    // is runid in id field and unique
+
+    return false;
+}
+
 
 
 pub fn print_appdb(df: &DataFrame) {
