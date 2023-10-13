@@ -25,6 +25,10 @@ enum Datatypes {
 
     /// bioinformatics workflows
     Nextflow {
+        /// List analyses run using Desktop Client
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        list: bool,
+
         /// path to nextflow binary (if not obvious)
         #[arg(short, long, default_value = None)]
         nxf_bin: Option<String>,
@@ -32,6 +36,10 @@ enum Datatypes {
         /// path to nextflow work folder
         #[arg(short = 'w', long, default_value = None)]
         nxf_work: Option<String>,
+
+        /// Export EPI2ME analysis by nun_name
+        #[arg(short, long)]
+        runid: Option<String>,
     },
 
     /// EPI2ME workflow results
@@ -79,8 +87,27 @@ fn main() {
 
             match &cliargs.command {
 
-                Some(Datatypes::Nextflow { nxf_bin, nxf_work }) => {
-                    nextflow::parse_nextflow_folder(nxf_work.clone(), nxf_bin.clone());
+                Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid }) => {
+                    let localruns = nextflow::parse_nextflow_folder(nxf_work.clone(), nxf_bin.clone());
+                    if localruns.is_none() {
+                        println!("No local nextflow run folders found at specified path");
+                        return;
+                    }
+
+                    if *list {
+                        nextflow::print_nxf_log(&localruns.unwrap());
+                        // todo - how do we print out dataframe with a more considered number of columns?
+                    } else {
+                        if runid.is_none() {
+                            println!("EPI2ME analysis twome archiving requires a --runid identifier (run_name)");
+                            return;
+                        } else {
+                            if !nextflow::validate_db_entry(runid.as_ref().unwrap().to_string(), localruns.as_ref().unwrap()) {
+                                println!("Unable to resolve specified EPI2ME analysis [{}] - check name", runid.as_ref().unwrap());
+                                return;
+                            }
+                        }
+                    }
                 },
 
                 Some(Datatypes::EPI2ME { list, bundlewf, runid, twome, force }) => {
@@ -121,6 +148,27 @@ fn main() {
 
                 Some(Datatypes::import { twome_path , dryrun}) => {
                     
+                    // validate that the twome file is signed and contains a manifest
+
+                    // create temporary (auto delete) folder to unpack twome archive into
+
+                    // for each of the workflows provided within the twome archive
+
+                        // is the archive trusted
+
+                        // does the corresponding workflow already exist on the system
+
+                            // if it does is it an ==offline== existing installation that is older than the twome
+
+                            // has force been specified
+
+                        // deploy package 
+
+                        // are there linked docker containers?
+
+                            // is docker reachable through API calls?
+
+                    // cleanup any residual temp folder content
                 },
 
                 None => {}

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 #[allow(non_snake_case)]
 #[derive(Debug)]
 struct Epi2MeAnalysis {
-    id: String  ,
+    id: String,
     path: String,
     name: String,
     status: String,
@@ -64,6 +64,25 @@ pub fn load_db(path: PathBuf) -> Result<DataFrame, rusqlite::Error> {
 
 pub fn validate_db_entry(runid: String, polardb: &DataFrame) -> bool {
     // is runid in name field and unique
+
+    let nameidx = polardb.find_idx_by_name("name");
+    if nameidx.is_some() {
+        let nameseries = polardb.select_at_idx(nameidx.unwrap());
+        if nameseries.is_some() {
+            println!("{:?}", nameseries);
+            let x = nameseries.unwrap();
+            
+            // let xx: i8 = x.
+        }
+    }
+
+    let ididx = polardb.find_idx_by_name("id");
+    if ididx.is_some() {
+        let idseries = polardb.select_at_idx(ididx.unwrap());
+        if idseries.is_some() {
+            println!("{:?}", idseries);
+        }
+    }
 
     // if this is not unique then list the id options and suggestion to list
 

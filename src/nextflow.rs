@@ -67,7 +67,7 @@ impl Default for NxfLogItem {
     }
 }
 
-pub fn parse_nextflow_folder(nxf_workdir: Option<String>, nxf_bin: Option<String>) {
+pub fn parse_nextflow_folder(nxf_workdir: Option<String>, nxf_bin: Option<String>) -> Option<DataFrame> {
 
     let nextflow_bin = get_nextflow_path(nxf_bin);
     if nextflow_bin.is_some() && nxf_workdir.is_some() {
@@ -128,13 +128,31 @@ pub fn parse_nextflow_folder(nxf_workdir: Option<String>, nxf_bin: Option<String
                 session_id,
                 command]).unwrap();
 
-            
-
-
-            print_nxf_log(&df);
+            //print_nxf_log(&df);
+            return Some(df);
         }
+
+        return None;
 }
 
+
+
+pub fn validate_db_entry(runid: String, polardb: &DataFrame) -> bool {
+    // is runid in name field and unique
+
+    let nameidx = polardb.find_idx_by_name("run_name");
+    if nameidx.is_some() {
+        let nameseries = polardb.select_at_idx(nameidx.unwrap());
+        if nameseries.is_some() {
+            println!("{:?}", nameseries);
+            let x = nameseries.unwrap();
+            
+            
+        }
+    }
+
+    return false;
+}
 
 
 pub fn print_nxf_log(df: &DataFrame) {
