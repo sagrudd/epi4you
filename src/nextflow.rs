@@ -3,6 +3,11 @@ use polars_core::prelude::*;
 use std::io::Cursor;
 use std::env;
 use std::path::PathBuf;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::Read;
+
+
 
 pub fn get_nextflow_path(nxf_bin: Option<String>) -> Option<String> {
     println!("getting nextflow path ...");
@@ -23,6 +28,22 @@ pub fn get_nextflow_path(nxf_bin: Option<String>) -> Option<String> {
             .output()
             .expect("failed to execute process");
 
+
+        let mut s = String::from_utf8_lossy(&output.stdout).into_owned();
+        if s.ends_with('\n') {
+            s.pop();
+            if s.ends_with('\r') {
+                s.pop();
+            }
+        }
+        if s.len() > 0 {
+            println!("nextflow candidate at [{}]", s);
+            let x = PathBuf::from(&s);
+            if x.exists() && x.is_file() {
+                // is that enough for now?
+                nextflow_bin = Some(s);
+            }
+        }
     }
 
     if nextflow_bin.is_some() {
