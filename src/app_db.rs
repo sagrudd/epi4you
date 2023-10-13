@@ -62,31 +62,37 @@ pub fn load_db(path: PathBuf) -> Result<DataFrame, rusqlite::Error> {
     Ok(df)
 }
 
-pub fn validate_db_entry(runid: String, polardb: &DataFrame) -> bool {
+
+fn filter_df_by_value(df: &DataFrame, column: &String, value: &String) -> Result<DataFrame, PolarsError> {
+
+    return df.clone()
+    .lazy()
+    .filter(col(column).is_in(lit(Series::from_iter(vec![String::from(value)])))).collect();
+
+}
+
+fn get_db_id_entry(runid: &String, polardb: &DataFrame) -> Result<DataFrame, PolarsError> {
     // is runid in name field and unique
+    let df = filter_df_by_value(polardb, &String::from("name"), runid);
+    let df2 = filter_df_by_value(polardb, &String::from("id"), runid);
+    return df.unwrap().vstack(&df2.unwrap());
+}
 
-    let nameidx = polardb.find_idx_by_name("name");
-    if nameidx.is_some() {
-        let nameseries = polardb.select_at_idx(nameidx.unwrap());
-        if nameseries.is_some() {
-            println!("{:?}", nameseries);
-            let x = nameseries.unwrap();
-            
-            // let xx: i8 = x.
-        }
+pub fn validate_db_entry(runid: &String, polardb: &DataFrame) -> bool {
+
+    let stacked = get_db_id_entry(runid, polardb);
+    println!("{:?}",stacked);
+
+    let row_count = &stacked.as_ref().unwrap().height(); // &stacked.unwrap().height();
+    if row_count == &(1 as usize) {
+        return true;
+    } else if row_count == &(0 as usize) {
+        println!("unable to resolve the analysis name; please check available analyses");
+        return false;
+    } else if row_count > &(1 as usize) {
+        println!("supplied id name is ambiguous - please try to refine the analysis identifier");
+        print_appdb(&stacked.unwrap().clone());
     }
-
-    let ididx = polardb.find_idx_by_name("id");
-    if ididx.is_some() {
-        let idseries = polardb.select_at_idx(ididx.unwrap());
-        if idseries.is_some() {
-            println!("{:?}", idseries);
-        }
-    }
-
-    // if this is not unique then list the id options and suggestion to list
-
-    // is runid in id field and unique
 
     return false;
 }

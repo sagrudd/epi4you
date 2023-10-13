@@ -119,8 +119,7 @@ fn main() {
                             println!("EPI2ME analysis twome archiving requires a --runid identifier (name or id)");
                             return;
                         } else {
-                            if !app_db::validate_db_entry(runid.as_ref().unwrap().to_string(), df.as_ref().unwrap()) {
-                                println!("Unable to resolve specified EPI2ME analysis [{}] - check name", runid.as_ref().unwrap());
+                            if !app_db::validate_db_entry(&runid.as_ref().unwrap().to_string(), df.as_ref().unwrap()) {
                                 return;
                             }
                         }
