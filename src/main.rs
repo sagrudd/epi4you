@@ -173,6 +173,8 @@ fn main() {
 
                 None => {}
             }
+        } else {
+            println!("db issue?");
         }
     }
 
