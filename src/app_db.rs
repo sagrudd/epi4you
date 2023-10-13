@@ -2,6 +2,8 @@ use rusqlite::{Connection, Result};
 use polars::prelude::*;
 use std::env;
 use std::path::PathBuf;
+use crate::workflow;
+
 
 #[allow(dead_code)]
 #[allow(non_snake_case)]
@@ -78,6 +80,43 @@ fn get_db_id_entry(runid: &String, polardb: &DataFrame) -> Result<DataFrame, Pol
     return df.unwrap().vstack(&df2.unwrap());
 }
 
+fn get_zero_val(df: &DataFrame, col: &String) -> String {
+    let idx = df.find_idx_by_name(col).unwrap();
+    let ser = df.select_at_idx(idx).unwrap().clone();
+    let chunked_array: Vec<Option<&str>> = ser.utf8().unwrap().into_iter().collect();
+    return String::from(chunked_array[0].unwrap());
+}
+
+pub fn get_qualified_analysis_path(runid: &String, polardb: &DataFrame) -> PathBuf {
+    let stacked = get_db_id_entry(runid, polardb).unwrap();
+    return PathBuf::from(get_zero_val(&stacked, &String::from("path")));
+}
+
+
+pub fn validate_qualified_analysis_workflow(runid: &String, polardb: &DataFrame, epi2wf_dir: &PathBuf) -> Option<PathBuf> {
+    let stacked = get_db_id_entry(runid, polardb).unwrap();
+
+    let workflow_user = get_zero_val(&stacked, &String::from("workflowUser"));
+    let workflow_repo = get_zero_val(&stacked, &String::from("workflowRepo"));
+    
+    let mut workflow: String = String::new();
+    
+    workflow.push_str(&workflow_user);
+    workflow.push_str(&std::path::MAIN_SEPARATOR.to_string());
+    workflow.push_str(&workflow_repo);
+    
+    println!("repo {}", workflow);
+
+    // let's check that the path exists ...
+    let wfdir_exists = workflow::check_defined_wfdir_exists(epi2wf_dir, &workflow_user, &workflow_repo);
+    if wfdir_exists.is_some() {
+        return wfdir_exists;
+    }
+
+    return None;
+}
+
+
 pub fn validate_db_entry(runid: &String, polardb: &DataFrame) -> bool {
 
     let stacked = get_db_id_entry(runid, polardb);
@@ -131,3 +170,4 @@ macro_rules! struct_to_dataframe {
     };
 }
 pub(crate) use struct_to_dataframe;
+

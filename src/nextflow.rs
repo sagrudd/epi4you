@@ -18,6 +18,10 @@ pub fn get_nextflow_path(nxf_bin: Option<String>) -> Option<String> {
         }
     } else {
         // which nextflow -- handle output state
+        let output = Command::new("which")
+            .arg("nextflow")
+            .output()
+            .expect("failed to execute process");
 
     }
 

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crate::manifest::{load_manifest_from_tarball, get_manifest};
 
 
-pub fn export_desktop_run(source: Option<PathBuf>, destination: Option<PathBuf>) {
+pub fn export_desktop_run(source: Option<PathBuf>, destination: Option<PathBuf>, bundlewf: Option<PathBuf>) {
 
     if source.is_some() && destination.is_some() {
         println!("packing [{:?}] into .2me format archive", source.clone().unwrap());

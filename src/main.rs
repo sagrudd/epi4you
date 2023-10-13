@@ -9,6 +9,7 @@ mod nextflow;
 mod bundle;
 mod manifest;
 mod provenance;
+mod workflow;
 
 
 /// Trivial application to package EPI2ME workflows and analysis results
@@ -80,9 +81,10 @@ enum Datatypes {
 fn main() {
     let cliargs = Args::parse();
 
-    let db_path = epi2me_db::find_db();
-    if db_path.is_some() {
-        let df = app_db::load_db(db_path.unwrap());
+    let epi2me_opt = epi2me_db::find_db();
+    if epi2me_opt.is_some() {
+        let epi2me = epi2me_opt.unwrap();
+        let df = app_db::load_db(epi2me.epi2db_path);
         if df.is_ok() {
 
             match &cliargs.command {
@@ -137,11 +139,23 @@ fn main() {
                                     println!("twome file is a directory - file is required");
                                     return;
                                 } 
-                            }
-
-
-                            
+                            }    
                         }
+
+                        let mut bundle_workflow: Option<PathBuf> = None;
+                        if bundlewf == &true {
+                            // ensure that a workflow for bundling is intact ...
+                            bundle_workflow = app_db::validate_qualified_analysis_workflow(
+                                &runid.as_ref().unwrap().to_string(), 
+                                df.as_ref().unwrap(), &epi2me.epi2wf_dir,
+                            )
+                        }
+
+                        // if we are here we have a destination and a unique runid - let's package something ...
+                        let src = Some(app_db::get_qualified_analysis_path(&runid.as_ref().unwrap().to_string(), df.as_ref().unwrap()));
+                        let dest = Some(PathBuf::from(twome.as_ref().unwrap()));
+                        
+                        bundle::export_desktop_run(src, dest, bundle_workflow);
                     }
                 },
 
