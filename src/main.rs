@@ -10,6 +10,7 @@ mod bundle;
 mod manifest;
 mod provenance;
 mod workflow;
+use std::env;
 
 
 /// Trivial application to package EPI2ME workflows and analysis results
@@ -67,7 +68,7 @@ enum Datatypes {
     },
 
     /// import .2me format tar archive
-    import {
+    Import {
         /// filepath to the .2me file to import
         #[arg(short, long)]
         twome_path: Option<String>,
@@ -90,7 +91,14 @@ fn main() {
             match &cliargs.command {
 
                 Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid }) => {
-                    let localruns = nextflow::parse_nextflow_folder(nxf_work.clone(), nxf_bin.clone());
+
+                    let mut nxf_workdir = nxf_work.clone();
+                    if nxf_workdir.is_none() {
+                        nxf_workdir = Some(env::current_dir().unwrap().to_string_lossy().into_owned());
+                        println!("Setting nextflow workdir to cwd [{:?}]", nxf_workdir.clone().unwrap());
+                    }
+
+                    let localruns = nextflow::parse_nextflow_folder(nxf_workdir.clone(), nxf_bin.clone());
                     if localruns.is_none() {
                         println!("No local nextflow run folders found at specified path");
                         return;
@@ -159,7 +167,7 @@ fn main() {
                     }
                 },
 
-                Some(Datatypes::import { twome_path , dryrun}) => {
+                Some(Datatypes::Import { twome_path , dryrun}) => {
                     
                     // validate that the twome file is signed and contains a manifest
 
