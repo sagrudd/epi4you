@@ -1,15 +1,36 @@
 use std::path::PathBuf;
 
-use crate::manifest::{load_manifest_from_tarball, get_manifest};
+use polars_core::prelude::DataFrame;
+
+use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2mePayload}, json::wrangle_manifest, app_db};
 
 
-pub fn export_desktop_run(source: Option<PathBuf>, destination: Option<PathBuf>, bundlewf: Option<PathBuf>) {
+pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Option<PathBuf>, bundlewf: Option<PathBuf>) {
+
+    let source = Some(app_db::get_qualified_analysis_path(&runid, polardb));
 
     if source.is_some() && destination.is_some() {
-        println!("packing [{:?}] into .2me format archive", source.clone().unwrap());
+        println!("packing [{:?}] into .2me format archive", &source.clone().unwrap());
 
         // identify a manifest file into which details will be written
-        let manifest = get_manifest(source);
+        let mut manifest = get_manifest(&source).unwrap();
+
+        manifest.payload.push(
+            package_desktop_analysis(&source.clone().unwrap())
+        );
+
+        wrangle_manifest(&manifest);
+    }
+}
+
+
+fn package_desktop_analysis(source: &PathBuf) -> Epi2mePayload {
+        // identify what is being packed into the tarball
+
+        let payload_a = Epi2mePayload{
+            archivetype: String::from("EPI2MELabsAnalysis"), 
+            ..Default::default()
+        };
 
         // identify the files that will be bundled into the archive ...
         let file_list = list_desktop_files();
@@ -17,7 +38,7 @@ pub fn export_desktop_run(source: Option<PathBuf>, destination: Option<PathBuf>,
 
         }
 
-    }
+        return payload_a;
 }
 
 
@@ -59,6 +80,14 @@ pub fn import_2me_bundle() {
 
 
 fn list_desktop_files() -> Vec<String> {
+
+    /*
+        for the purposes of signing the archive with a checksum; we need to load in the information in a strictly controlled
+        way - just alphabetical should be fine; maintain information on the relative file path and filesize; with this it
+        should be trivial to ensure that the integrity of a packaged container is maintained
+    
+     */
+
     let mut xx: Vec<String> = Vec::new();
 
 

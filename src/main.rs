@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ArgAction};
+use manifest::load_manifest_from_tarball;
 
 mod epi2me_db;
 mod json;
@@ -11,7 +12,6 @@ mod manifest;
 mod provenance;
 mod workflow;
 use std::env;
-
 
 /// Trivial application to package EPI2ME workflows and analysis results
 #[derive(Parser)]
@@ -134,6 +134,9 @@ fn main() {
                             }
                         }
 
+                        let runid_str = &runid.as_ref().unwrap().to_string();
+                        let polardb = df.as_ref().unwrap();
+
                         if twome.is_none() {
                             println!("EPI2ME twome archiving requires a --twome <file> target to writing to");
                             return; 
@@ -154,21 +157,22 @@ fn main() {
                         if bundlewf == &true {
                             // ensure that a workflow for bundling is intact ...
                             bundle_workflow = app_db::validate_qualified_analysis_workflow(
-                                &runid.as_ref().unwrap().to_string(), 
-                                df.as_ref().unwrap(), &epi2me.epi2wf_dir,
+                                &runid_str.to_string(), 
+                                polardb, &epi2me.epi2wf_dir,
                             )
                         }
 
                         // if we are here we have a destination and a unique runid - let's package something ...
-                        let src = Some(app_db::get_qualified_analysis_path(&runid.as_ref().unwrap().to_string(), df.as_ref().unwrap()));
                         let dest = Some(PathBuf::from(twome.as_ref().unwrap()));
-                        
-                        bundle::export_desktop_run(src, dest, bundle_workflow);
+                        bundle::export_desktop_run(&runid_str, polardb, dest, bundle_workflow);
                     }
                 },
 
-                Some(Datatypes::Import { twome_path , dryrun}) => {
+                Some(Datatypes::Import { twome_path: _ , dryrun: _}) => {
                     
+                    let manifest = load_manifest_from_tarball();
+                    if manifest.is_some() {
+
                     // validate that the twome file is signed and contains a manifest
 
                     // create temporary (auto delete) folder to unpack twome archive into
@@ -190,6 +194,10 @@ fn main() {
                             // is docker reachable through API calls?
 
                     // cleanup any residual temp folder content
+
+
+                    }
+
                 },
 
                 None => {}

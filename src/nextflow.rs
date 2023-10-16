@@ -3,9 +3,6 @@ use polars_core::prelude::*;
 use std::io::Cursor;
 use std::env;
 use std::path::PathBuf;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::io::Read;
 
 
 
@@ -162,7 +159,7 @@ pub fn parse_nextflow_folder(nxf_workdir: Option<String>, nxf_bin: Option<String
 
 
 
-pub fn validate_db_entry(runid: String, polardb: &DataFrame) -> bool {
+pub fn validate_db_entry(_runid: String, polardb: &DataFrame) -> bool {
     // is runid in name field and unique
 
     let nameidx = polardb.find_idx_by_name("run_name");
@@ -170,7 +167,7 @@ pub fn validate_db_entry(runid: String, polardb: &DataFrame) -> bool {
         let nameseries = polardb.select_at_idx(nameidx.unwrap());
         if nameseries.is_some() {
             println!("{:?}", nameseries);
-            let x = nameseries.unwrap();
+            let _x = nameseries.unwrap();
             
             
         }

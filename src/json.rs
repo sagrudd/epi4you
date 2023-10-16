@@ -2,6 +2,8 @@ use std::path::PathBuf;
 use std::fs::File;
 use serde::{Serialize, Deserialize};
 use serde_json;
+
+use crate::manifest::Epi2MeManifest;
 extern crate serde;
 
 #[derive(Serialize, Deserialize)]
@@ -23,4 +25,10 @@ pub fn config_json(path_buf: &PathBuf) -> String {
     
     println!("\tjson parsed [workDir={}]", epi2me_setup.workingDirectory);
     return epi2me_setup.workingDirectory;
+}
+
+pub fn wrangle_manifest(manifest: &Epi2MeManifest) {
+
+    let x = serde_json::to_string_pretty(&manifest);
+    println!("{}", x.unwrap());
 }
