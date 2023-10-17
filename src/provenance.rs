@@ -17,7 +17,7 @@ impl Default for Epi2MeProvenance {
         Epi2MeProvenance {
             id: Uuid::new_v4().to_string(),
             action: String::from("undefined"),
-            user: String::from("unknown"),
+            user: whoami::username(),
             timestamp: Local::now().to_string(),
         }
     }
