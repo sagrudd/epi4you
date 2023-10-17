@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use glob::glob;
 
 use polars_core::prelude::DataFrame;
 
@@ -21,6 +22,18 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
 
             // load the files into the Epi2meDesktopAnalysis struct
             let files = Vec::<FileManifest>::new();
+
+            let globpat = source.unwrap().into_os_string().into_string().unwrap();
+            let result = [&globpat, "/**/*.*"].join("");
+
+            println!("fishing for files at [{}]", result);
+
+            for entry in glob(&result).expect("Failed to read glob pattern") {
+                match entry {
+                    Ok(path) => println!("{:?}", path.display()),
+                    Err(e) => println!("{:?}", e),
+                }
+            }
 
             manifest.payload.push( Epi2MeContent::Epi2mePayload(zz.unwrap()) );
 
