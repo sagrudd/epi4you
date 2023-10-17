@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use polars_core::prelude::DataFrame;
 
-use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2mePayload}, json::wrangle_manifest, app_db};
+use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2meDesktopAnalysis, Epi2MeContent}, json::wrangle_manifest, app_db};
 
 
 pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Option<PathBuf>, bundlewf: Option<PathBuf>) {
@@ -15,20 +15,19 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
         // identify a manifest file into which details will be written
         let mut manifest = get_manifest(&source).unwrap();
 
-        manifest.payload.push(
-            package_desktop_analysis(&source.clone().unwrap())
-        );
+        let zz = package_desktop_analysis(&source.clone().unwrap());
+
+        manifest.payload.push( Epi2MeContent::Epi2mePayload(zz) );
 
         wrangle_manifest(&manifest);
     }
 }
 
 
-fn package_desktop_analysis(source: &PathBuf) -> Epi2mePayload {
+fn package_desktop_analysis(source: &PathBuf) -> Epi2meDesktopAnalysis {
         // identify what is being packed into the tarball
 
-        let payload_a = Epi2mePayload{
-            archivetype: String::from("EPI2MELabsAnalysis"), 
+        let payload_a = Epi2meDesktopAnalysis{
             ..Default::default()
         };
 

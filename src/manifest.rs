@@ -23,11 +23,34 @@ impl Default for FileManifest {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct Epi2MEWorkflow {
+    pub workflow_name: String,
+    pub workflow_user: String,
+    pub workflow_version: String,
+    pub workflow_commit: String,
+    pub workflow_source: String,
+    pub files: Vec<FileManifest>,
+}
+
+impl Default for Epi2MEWorkflow {
+    fn default() -> Epi2MEWorkflow {
+
+        Epi2MEWorkflow {
+            workflow_name: String::from("undefined"),
+            workflow_user: String::from("undefined"),
+            workflow_version: String::from("undefined"),
+            workflow_commit: String::from("undefined"),
+            workflow_source: String::from("undefined"),
+            files: Vec::<FileManifest>::new(),
+        }
+    }
+}
+
 
 #[derive(Serialize, Deserialize)]
 #[allow(non_snake_case)]
-pub struct Epi2mePayload {
-    pub archivetype: String,
+pub struct Epi2meDesktopAnalysis {
     pub id: String,
     pub path: String,
     pub name: String,
@@ -41,11 +64,10 @@ pub struct Epi2mePayload {
     pub files: Vec<FileManifest>,
 }
 
-impl Default for Epi2mePayload {
-    fn default() -> Epi2mePayload {
+impl Default for Epi2meDesktopAnalysis {
+    fn default() -> Epi2meDesktopAnalysis {
 
-        Epi2mePayload {
-            archivetype: String::from("undefined"),
+        Epi2meDesktopAnalysis {
             id: String::from("undefined"),
             path: String::from("undefined"),
             name: String::from("undefined"),
@@ -63,11 +85,19 @@ impl Default for Epi2mePayload {
 
 
 #[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum Epi2MeContent {
+    Epi2mePayload(Epi2meDesktopAnalysis),
+    Epi2MEWorkflow(Epi2MEWorkflow),
+  }
+
+
+#[derive(Serialize, Deserialize)]
 pub struct Epi2MeManifest {
     pub id: String,
     pub src_path: String,
     pub provenance: Vec<Epi2MeProvenance>,
-    pub payload: Vec<Epi2mePayload>,
+    pub payload: Vec<Epi2MeContent>,
     pub filecount: u8,
     pub files_size: u8,
 
@@ -80,10 +110,9 @@ impl Default for Epi2MeManifest {
             id: String::from("undefined"),
             src_path: String::from("undefined"),
             provenance: Vec::<Epi2MeProvenance>::new(),
-            payload: Vec::<Epi2mePayload>::new(),
+            payload: Vec::<Epi2MeContent>::new(),
             filecount: 0,
             files_size: 0,
-        
             signature: String::from("undefined"),
         }
     }
