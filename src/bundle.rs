@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use polars_core::prelude::DataFrame;
 
-use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2MeContent}, json::wrangle_manifest, app_db};
+use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2MeContent, FileManifest}, json::wrangle_manifest, app_db, epi2me_tar};
 
 
 pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Option<PathBuf>, _bundlewf: Option<PathBuf>) {
@@ -19,10 +19,14 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
 
         if zz.is_some() {
 
+            // load the files into the Epi2meDesktopAnalysis struct
+            let files = Vec::<FileManifest>::new();
+
             manifest.payload.push( Epi2MeContent::Epi2mePayload(zz.unwrap()) );
 
             wrangle_manifest(&manifest);
 
+            epi2me_tar::tar(destination.unwrap(), files);
         }
     }
 }

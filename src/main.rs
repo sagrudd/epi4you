@@ -11,6 +11,8 @@ mod bundle;
 mod manifest;
 mod provenance;
 mod workflow;
+mod epi2me_tar;
+
 use std::env;
 
 /// Trivial application to package EPI2ME workflows and analysis results
