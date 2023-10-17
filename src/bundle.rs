@@ -5,7 +5,7 @@ use polars_core::prelude::DataFrame;
 use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2meDesktopAnalysis, Epi2MeContent}, json::wrangle_manifest, app_db};
 
 
-pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Option<PathBuf>, bundlewf: Option<PathBuf>) {
+pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Option<PathBuf>, _bundlewf: Option<PathBuf>) {
 
     let source = Some(app_db::get_qualified_analysis_path(&runid, polardb));
 
@@ -24,7 +24,7 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
 }
 
 
-fn package_desktop_analysis(source: &PathBuf) -> Epi2meDesktopAnalysis {
+fn package_desktop_analysis(_source: &PathBuf) -> Epi2meDesktopAnalysis {
         // identify what is being packed into the tarball
 
         let payload_a = Epi2meDesktopAnalysis{
@@ -33,7 +33,7 @@ fn package_desktop_analysis(source: &PathBuf) -> Epi2meDesktopAnalysis {
 
         // identify the files that will be bundled into the archive ...
         let file_list = list_desktop_files();
-        for file in file_list {
+        for _file in file_list {
 
         }
 
@@ -41,12 +41,7 @@ fn package_desktop_analysis(source: &PathBuf) -> Epi2meDesktopAnalysis {
 }
 
 
-pub fn export_nextflow_run() {
-
-}
-
-
-pub fn import_2me_bundle() {
+pub fn _import_2me_bundle() {
 
     // load manifest from tarball
     let manifest = load_manifest_from_tarball();
@@ -87,8 +82,6 @@ fn list_desktop_files() -> Vec<String> {
     
      */
 
-    let mut xx: Vec<String> = Vec::new();
 
-
-    return xx;
+    return Vec::<String>::new();
 }

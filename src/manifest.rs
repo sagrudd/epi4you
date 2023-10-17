@@ -131,7 +131,7 @@ pub fn get_manifest(source: &Option<PathBuf>) -> Option<Epi2MeManifest> {
                 ..Default::default()
             };
 
-            let prov = append_provenance(String::from("WHAT"), None, None, String::from(""));
+            let prov = append_provenance(String::from("manifest_created"), None, None, String::from(""));
 
             let _ = &man.provenance.push(prov);
 
