@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use polars_core::prelude::DataFrame;
 
-use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2meDesktopAnalysis, Epi2MeContent}, json::wrangle_manifest, app_db};
+use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2MeContent}, json::wrangle_manifest, app_db};
 
 
 pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Option<PathBuf>, _bundlewf: Option<PathBuf>) {
@@ -15,30 +15,18 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
         // identify a manifest file into which details will be written
         let mut manifest = get_manifest(&source).unwrap();
 
-        let zz = package_desktop_analysis(&source.clone().unwrap());
+        let zz = app_db::get_analysis_struct(runid, polardb);
 
-        manifest.payload.push( Epi2MeContent::Epi2mePayload(zz) );
+        if zz.is_some() {
 
-        wrangle_manifest(&manifest);
+            manifest.payload.push( Epi2MeContent::Epi2mePayload(zz.unwrap()) );
+
+            wrangle_manifest(&manifest);
+
+        }
     }
 }
 
-
-fn package_desktop_analysis(_source: &PathBuf) -> Epi2meDesktopAnalysis {
-        // identify what is being packed into the tarball
-
-        let payload_a = Epi2meDesktopAnalysis{
-            ..Default::default()
-        };
-
-        // identify the files that will be bundled into the archive ...
-        let file_list = list_desktop_files();
-        for _file in file_list {
-
-        }
-
-        return payload_a;
-}
 
 
 pub fn _import_2me_bundle() {
@@ -73,7 +61,7 @@ pub fn _import_2me_bundle() {
 
 
 
-fn list_desktop_files() -> Vec<String> {
+fn _list_desktop_files() -> Vec<String> {
 
     /*
         for the purposes of signing the archive with a checksum; we need to load in the information in a strictly controlled

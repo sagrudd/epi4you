@@ -2,6 +2,7 @@ use rusqlite::{Connection, Result};
 use polars::prelude::*;
 use std::env;
 use std::path::PathBuf;
+use crate::manifest::Epi2meDesktopAnalysis;
 use crate::workflow;
 
 
@@ -136,6 +137,29 @@ pub fn validate_db_entry(runid: &String, polardb: &DataFrame) -> bool {
     return false;
 }
 
+
+pub fn get_analysis_struct(runid: &String, polardb: &DataFrame) -> Option<Epi2meDesktopAnalysis> {
+    if validate_db_entry(runid, polardb) {
+        let stacked = get_db_id_entry(runid, polardb).unwrap();
+        // this is obligate pass due to previous validation
+
+        let x = Epi2meDesktopAnalysis { 
+            id: get_zero_val(&stacked, &String::from("id")),
+            path: get_zero_val(&stacked, &String::from("path")),
+            name: get_zero_val(&stacked, &String::from("name")),
+            status: get_zero_val(&stacked, &String::from("status")),
+            workflowRepo: get_zero_val(&stacked, &String::from("workflowRepo")),
+            workflowUser: get_zero_val(&stacked, &String::from("workflowUser")),
+            workflowCommit: get_zero_val(&stacked, &String::from("workflowCommit")),
+            workflowVersion: get_zero_val(&stacked, &String::from("workflowVersion")),
+            createdAt: get_zero_val(&stacked, &String::from("createdAt")),
+            updatedAt: get_zero_val(&stacked, &String::from("updatedAt")),
+            ..Default::default() };
+        return Some(x);
+    }
+
+    return None;
+}
 
 
 pub fn print_appdb(df: &DataFrame) {
