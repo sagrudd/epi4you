@@ -1,9 +1,35 @@
-use std::path::PathBuf;
+
+use std::{env, path::PathBuf};
+
 use glob::glob;
 
 use polars_core::prelude::DataFrame;
 
+use data_encoding::HEXUPPER;
+use ring::digest::{Context, Digest, SHA256};
+use std::fs::File;
+use std::io::{BufReader, Read};
+
+
 use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2MeContent, FileManifest}, json::wrangle_manifest, app_db, epi2me_tar};
+
+
+fn sha256_digest(path: &str) -> Option<Digest> {
+
+    let input = File::open(path).unwrap();
+    let mut reader = BufReader::new(input);
+
+    let mut context = Context::new(&SHA256);
+    let mut buffer = [0; 1024];
+    loop {
+        let count = reader.read(&mut buffer).unwrap();
+        if count == 0 {
+            break;
+        }
+        context.update(&buffer[..count]);
+    }
+    return Some(context.finish());
+}
 
 
 pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Option<PathBuf>, _bundlewf: Option<PathBuf>) {
@@ -21,18 +47,34 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
         if zz.is_some() {
 
             // load the files into the Epi2meDesktopAnalysis struct
-            let files = Vec::<FileManifest>::new();
+            let mut files = Vec::<FileManifest>::new();
 
-            let globpat = source.unwrap().into_os_string().into_string().unwrap();
+            let globpat = &source.unwrap().into_os_string().into_string().unwrap();
             let result = [&globpat, "/**/*.*"].join("");
 
             println!("fishing for files at [{}]", result);
 
+            let _ = env::set_current_dir(&globpat);
+
             for entry in glob(&result).expect("Failed to read glob pattern") {
-                match entry {
-                    Ok(path) => println!("{:?}", path.display()),
-                    Err(e) => println!("{:?}", e),
+                if entry.is_ok() {
+                    let e = entry.unwrap();
+                    if e.is_file() {
+                    let fp = &e.as_os_str().to_str().unwrap();
+                    println!("{}", &fp);
+
+                    let checksum = sha256_digest(&fp).unwrap();
+                    let vv = HEXUPPER.encode(checksum.as_ref());
+                    println!("file [{}] with checksum [{}]", &fp, &vv);
+
+                    files.push(FileManifest {
+                        filename: String::from(e.file_name().unwrap().to_os_string().to_str().unwrap()),
+                        relative_path: String::from(""),
+                        size: e.metadata().unwrap().len(),
+                        md5sum: vv,
+                    })
                 }
+            }
             }
 
             manifest.payload.push( Epi2MeContent::Epi2mePayload(zz.unwrap()) );

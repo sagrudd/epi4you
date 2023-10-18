@@ -8,7 +8,7 @@ static MANIFEST_JSON: &str = "4u_manifest.json";
 pub struct FileManifest {
     pub filename: String,
     pub relative_path: String,
-    pub size: String,
+    pub size: u64,
     pub md5sum: String,
 }
 impl Default for FileManifest {
@@ -17,7 +17,7 @@ impl Default for FileManifest {
         FileManifest {
             filename: String::from("undefined"),
             relative_path: String::from("undefined"),
-            size: String::from("undefined"),
+            size: 0,
             md5sum: String::from("undefined"),
         }
     }
