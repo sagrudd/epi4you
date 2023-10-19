@@ -27,8 +27,12 @@ pub fn config_json(path_buf: &PathBuf) -> String {
     return epi2me_setup.workingDirectory;
 }
 
-pub fn wrangle_manifest(manifest: &Epi2MeManifest) {
 
-    let x = serde_json::to_string_pretty(&manifest);
-    println!("{}", x.unwrap());
+pub fn get_manifest_str(manifest: &Epi2MeManifest) -> String {
+    serde_json::to_string_pretty(&manifest).unwrap()
+}
+
+
+pub fn wrangle_manifest(manifest: &Epi2MeManifest) {
+    println!("{}", get_manifest_str(manifest));
 }

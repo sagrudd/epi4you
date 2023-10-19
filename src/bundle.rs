@@ -6,16 +6,18 @@ use glob::glob;
 use polars_core::prelude::DataFrame;
 
 use data_encoding::HEXUPPER;
-use ring::digest::{Context, Digest, SHA256};
+use ring::digest::{Context, SHA256};
+use stringreader::StringReader;
 use std::fs::File;
 use std::io::{BufReader, Read};
 
 
 use crate::epi2me_db;
+use crate::json::get_manifest_str;
 use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2MeContent, FileManifest}, json::wrangle_manifest, app_db, epi2me_tar};
 
 
-fn sha256_digest(path: &str) -> Option<Digest> {
+fn sha256_digest(path: &str) -> String {
 
     let input = File::open(path).unwrap();
     let mut reader = BufReader::new(input);
@@ -29,7 +31,26 @@ fn sha256_digest(path: &str) -> Option<Digest> {
         }
         context.update(&buffer[..count]);
     }
-    return Some(context.finish());
+
+    HEXUPPER.encode(context.finish().as_ref())
+}
+
+
+fn sha256_str_digest(payload_str: &str) -> String {
+
+    let streader = StringReader::new(payload_str);
+    let mut reader = BufReader::new(streader);
+
+    let mut context = Context::new(&SHA256);
+    let mut buffer = [0; 1024];
+    loop {
+        let count = reader.read(&mut buffer).unwrap();
+        if count == 0 {
+            break;
+        }
+        context.update(&buffer[..count]);
+    }
+    HEXUPPER.encode(context.finish().as_ref())
 }
 
 
@@ -59,6 +80,8 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
 
             let _ = env::set_current_dir(&globpat);
 
+            let mut files_size: u64 = 0;
+
             for entry in glob(&result).expect("Failed to read glob pattern") {
                 if entry.is_ok() {
                     let e = entry.unwrap();
@@ -75,24 +98,37 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
 
                     //println!("{}", &fp);
 
-                    let checksum = sha256_digest(&fp).unwrap();
-                    let vv = HEXUPPER.encode(checksum.as_ref());
+                    let checksum = sha256_digest(&fp);
+                    
                     //println!("file [{}] with checksum [{}]", &fp, &vv);
+
+
+                    let file_size = e.metadata().unwrap().len();
+                    files_size += file_size;
 
                     vehicle.files.push(FileManifest {
                         filename: String::from(e.file_name().unwrap().to_os_string().to_str().unwrap()),
                         relative_path: String::from(relative_path.clone().to_string_lossy().to_string()),
-                        size: e.metadata().unwrap().len(),
-                        md5sum: vv,
+                        size: file_size,
+                        md5sum: checksum,
                     })
                 }
             }
             }
 
+            let filecount = vehicle.files.len();
+
             epi2me_tar::tar(destination.unwrap(), &vehicle.files);
             manifest.payload.push( Epi2MeContent::Epi2mePayload(vehicle) );
 
-            //wrangle_manifest(&manifest);
+            manifest.filecount = u8::try_from(filecount).unwrap(); 
+            manifest.files_size = files_size;  
+
+            let manifest_signature = sha256_str_digest(get_manifest_str(&manifest).as_str());
+            manifest.signature = manifest_signature;
+
+
+            wrangle_manifest(&manifest);
 
             
         }

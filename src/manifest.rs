@@ -99,7 +99,7 @@ pub struct Epi2MeManifest {
     pub provenance: Vec<Epi2MeProvenance>,
     pub payload: Vec<Epi2MeContent>,
     pub filecount: u8,
-    pub files_size: u8,
+    pub files_size: u64,
 
     pub signature: String,
 }
