@@ -13,8 +13,9 @@ use std::io::{BufReader, Read};
 
 
 use crate::epi2me_db;
-use crate::json::get_manifest_str;
-use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2MeContent, FileManifest}, json::wrangle_manifest, app_db, epi2me_tar};
+use crate::json::{get_manifest_str, write_manifest_str};
+use crate::manifest::MANIFEST_JSON;
+use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2MeContent, FileManifest}, app_db, epi2me_tar};
 
 
 fn sha256_digest(path: &str) -> String {
@@ -56,10 +57,12 @@ fn sha256_str_digest(payload_str: &str) -> String {
 
 pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Option<PathBuf>, _bundlewf: Option<PathBuf>) {
 
-    let source = Some(app_db::get_qualified_analysis_path(&runid, polardb));
+    let source_opt = Some(app_db::get_qualified_analysis_path(&runid, polardb));
+    let local_prefix = epi2me_db::find_db().unwrap().epi2path;
 
-    if source.is_some() && destination.is_some() {
-        println!("packing [{:?}] into .2me format archive", &source.clone().unwrap());
+    if source_opt.is_some() && destination.is_some() {
+        let source = source_opt.unwrap();
+        println!("packing [{:?}] into .2me format archive", &source.clone());
 
         // identify a manifest file into which details will be written
         let mut manifest = get_manifest(&source).unwrap();
@@ -73,7 +76,7 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
             // load the files into the Epi2meDesktopAnalysis struct
             //let mut files = Vec::<FileManifest>::new();
 
-            let globpat = &source.unwrap().into_os_string().into_string().unwrap();
+            let globpat = &source.clone().into_os_string().into_string().unwrap();
             let result = [&globpat, "/**/*.*"].join("");
 
             println!("fishing for files at [{}]", result);
@@ -91,18 +94,18 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
                         let mut parent = e.clone();
                         let _ = parent.pop();
 
-                        let local_prefix = epi2me_db::find_db().unwrap().epi2path;
+                        
 
-                        let mut relative_path = PathBuf::from(e.strip_prefix(local_prefix).unwrap());
-                        let _ = relative_path.pop();
+                        //let mut relative_path = PathBuf::from(e.strip_prefix(&local_prefix).unwrap());
+                        //let _ = relative_path.pop();
 
+
+                    let relative_path = clip_relative_path(&e, &local_prefix);
                     //println!("{}", &fp);
 
                     let checksum = sha256_digest(&fp);
                     
                     //println!("file [{}] with checksum [{}]", &fp, &vv);
-
-
                     let file_size = e.metadata().unwrap().len();
                     files_size += file_size;
 
@@ -117,23 +120,47 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
             }
 
             let filecount = vehicle.files.len();
+            let filecontext = vehicle.files.clone();
 
-            epi2me_tar::tar(destination.unwrap(), &vehicle.files);
             manifest.payload.push( Epi2MeContent::Epi2mePayload(vehicle) );
-
             manifest.filecount = u8::try_from(filecount).unwrap(); 
             manifest.files_size = files_size;  
 
             let manifest_signature = sha256_str_digest(get_manifest_str(&manifest).as_str());
             manifest.signature = manifest_signature;
+            
+            // add the file manifest to the manifest
+
+            let mut manifest_pb = source.clone();
+            manifest_pb.push(MANIFEST_JSON);
+            write_manifest_str(&manifest, &manifest_pb);
+
+            
+
+            // tar up the contents specified in the manifest
+            epi2me_tar::tar(destination.unwrap(), &filecontext, &get_relative_path(&manifest_pb, &local_prefix));
+
+    
 
 
-            wrangle_manifest(&manifest);
+            // wrangle_manifest(&manifest);
 
             
         }
     }
 }
+
+
+fn clip_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
+    let mut relative_path = get_relative_path(e, local_prefix);
+    let _ = relative_path.pop();
+    return relative_path;
+}
+
+fn get_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
+    PathBuf::from(e.strip_prefix(local_prefix).unwrap())
+}
+
 
 
 

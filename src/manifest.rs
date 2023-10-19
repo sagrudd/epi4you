@@ -2,9 +2,9 @@ use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::wrangle_manifest};
 
-static MANIFEST_JSON: &str = "4u_manifest.json";
+pub static MANIFEST_JSON: &str = "4u_manifest.json";
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct FileManifest {
     pub filename: String,
     pub relative_path: String,
@@ -119,9 +119,9 @@ impl Default for Epi2MeManifest {
 }
 
 
-pub fn get_manifest(source: &Option<PathBuf>) -> Option<Epi2MeManifest> {
-    if source.is_some() {
-        let mut manifest = source.clone().unwrap();
+pub fn get_manifest(source: &PathBuf) -> Option<Epi2MeManifest> {
+  
+        let mut manifest = source.clone();
         manifest.push(MANIFEST_JSON);
         if !manifest.exists() {
             // we need to create one
@@ -141,8 +141,8 @@ pub fn get_manifest(source: &Option<PathBuf>) -> Option<Epi2MeManifest> {
         } else {
             // we should load the manifest
         }
-    }
-    return None;
+
+        return None;
 }
 
 

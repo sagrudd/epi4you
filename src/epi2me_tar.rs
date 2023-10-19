@@ -5,7 +5,7 @@ use tar::Builder;
 use crate::{manifest::FileManifest, epi2me_db};
 
 
-pub fn tar(tarfile: PathBuf, files: &Vec<FileManifest>) {
+pub fn tar(tarfile: PathBuf, files: &Vec<FileManifest>, manifest: &PathBuf) {
 
     let tarfile = File::create(tarfile).unwrap();
     let mut a = Builder::new(tarfile);
@@ -23,7 +23,8 @@ pub fn tar(tarfile: PathBuf, files: &Vec<FileManifest>) {
         let _ = a.append_path(file_to_tar);
     }
 
-    
+    println!("writing manifest {:?}", manifest);
+    let _ = a.append_path(manifest);
 
 }
 
