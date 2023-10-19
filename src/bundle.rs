@@ -11,6 +11,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 
 
+use crate::epi2me_db;
 use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2MeContent, FileManifest}, json::wrangle_manifest, app_db, epi2me_tar};
 
 
@@ -46,8 +47,10 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
 
         if zz.is_some() {
 
+            let mut vehicle = zz.unwrap();
+
             // load the files into the Epi2meDesktopAnalysis struct
-            let mut files = Vec::<FileManifest>::new();
+            //let mut files = Vec::<FileManifest>::new();
 
             let globpat = &source.unwrap().into_os_string().into_string().unwrap();
             let result = [&globpat, "/**/*.*"].join("");
@@ -60,16 +63,25 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
                 if entry.is_ok() {
                     let e = entry.unwrap();
                     if e.is_file() {
-                    let fp = &e.as_os_str().to_str().unwrap();
-                    println!("{}", &fp);
+                        let fp = e.as_os_str().to_str().unwrap();
+
+                        let mut parent = e.clone();
+                        let _ = parent.pop();
+
+                        let local_prefix = epi2me_db::find_db().unwrap().epi2path;
+
+                        let mut relative_path = PathBuf::from(e.strip_prefix(local_prefix).unwrap());
+                        let _ = relative_path.pop();
+
+                    //println!("{}", &fp);
 
                     let checksum = sha256_digest(&fp).unwrap();
                     let vv = HEXUPPER.encode(checksum.as_ref());
-                    println!("file [{}] with checksum [{}]", &fp, &vv);
+                    //println!("file [{}] with checksum [{}]", &fp, &vv);
 
-                    files.push(FileManifest {
+                    vehicle.files.push(FileManifest {
                         filename: String::from(e.file_name().unwrap().to_os_string().to_str().unwrap()),
-                        relative_path: String::from(""),
+                        relative_path: String::from(relative_path.clone().to_string_lossy().to_string()),
                         size: e.metadata().unwrap().len(),
                         md5sum: vv,
                     })
@@ -77,11 +89,12 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
             }
             }
 
-            manifest.payload.push( Epi2MeContent::Epi2mePayload(zz.unwrap()) );
+            epi2me_tar::tar(destination.unwrap(), &vehicle.files);
+            manifest.payload.push( Epi2MeContent::Epi2mePayload(vehicle) );
 
-            wrangle_manifest(&manifest);
+            //wrangle_manifest(&manifest);
 
-            epi2me_tar::tar(destination.unwrap(), files);
+            
         }
     }
 }
