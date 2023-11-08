@@ -165,17 +165,32 @@ pub fn get_analysis_struct(runid: &String, polardb: &DataFrame) -> Option<Epi2me
 pub fn print_appdb(df: &DataFrame) {
     env::set_var("POLARS_FMT_TABLE_HIDE_DATAFRAME_SHAPE_INFORMATION", "1");
     env::set_var("POLARS_FMT_TABLE_HIDE_COLUMN_DATA_TYPES","1");
+    env::set_var("POLARS_FMT_MAX_ROWS", "20");
     let df2 = df!(
         "id" => df.column("id").unwrap(),
         "name" => df.column("name").unwrap(),
         "workflowRepo" => df.column("workflowRepo").unwrap(),
         "createdAt" => df.column("createdAt").unwrap(),
+        "status" => df.column("status").unwrap(),
     );
 
     if df2.is_ok() {
         println!("{:?}", df2.unwrap());
     }
 }
+
+
+pub fn dbmanager(epi2me_instances: &DataFrame, list: &bool) {
+    println!("Database functionality called ...");
+
+
+    if *list {
+        println!("Listing databases");
+        print_appdb(epi2me_instances);
+    }
+
+}
+
 
 
 macro_rules! struct_to_dataframe {

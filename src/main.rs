@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use app_db::dbmanager;
 use clap::{Parser, Subcommand, ArgAction};
 use manifest::load_manifest_from_tarball;
 
@@ -26,6 +27,13 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Datatypes {
+
+    Database {
+        /// List database entries
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        list: bool,
+    },
+
 
     /// bioinformatics workflows
     Nextflow {
@@ -91,6 +99,10 @@ fn main() {
         if df.is_ok() {
 
             match &cliargs.command {
+
+                Some(Datatypes::Database { list }) => {
+                    dbmanager(&df.unwrap(), list);
+                },
 
                 Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid }) => {
 
