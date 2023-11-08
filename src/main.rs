@@ -32,6 +32,14 @@ enum Datatypes {
         /// List database entries
         #[arg(short, long, action=ArgAction::SetTrue)]
         list: bool,
+
+        /// define EPI2ME Desktop analysis
+        #[arg(short, long)]
+        runid: Option<String>,
+
+        /// modify status field
+        #[arg(short, long, )]
+        status: Option<String>,
     },
 
 
@@ -95,13 +103,13 @@ fn main() {
     let epi2me_opt = epi2me_db::find_db();
     if epi2me_opt.is_some() {
         let epi2me = epi2me_opt.unwrap();
-        let df = app_db::load_db(epi2me.epi2db_path);
+        let df = app_db::load_db(&epi2me.epi2db_path);
         if df.is_ok() {
 
             match &cliargs.command {
 
-                Some(Datatypes::Database { list }) => {
-                    dbmanager(&df.unwrap(), list);
+                Some(Datatypes::Database { list, runid, status }) => {
+                    dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status);
                 },
 
                 Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid }) => {

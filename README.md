@@ -17,3 +17,13 @@ Listing databases
 │ 01HBWYBQ6EQZ7199ZRY1NZESXJ ┆ boring_wright       ┆ wf-metagenomics     ┆ 2023-10-04 08:55:05.680 +00:00 ┆ COMPLETED │
 └────────────────────────────┴─────────────────────┴─────────────────────┴────────────────────────────────┴───────────┘
 ```
+
+### Update workflow instance run status
+
+There are times when computers, workflows, and data do not behave. For users with the anxiety of having either incomplete
+or broken analyses in their run folder, exit states can be updated. To correct e.g. a workflow with an `ERROR` status
+we can mark this as `COMPLETED` with
+
+```
+epi4you database --runid suspicious_khorana --status ERROR
+```

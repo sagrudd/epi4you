@@ -23,7 +23,7 @@ struct Epi2MeAnalysis {
 }
 
 #[allow(non_snake_case)]
-pub fn load_db(path: PathBuf) -> Result<DataFrame, rusqlite::Error> {
+pub fn load_db(path: &PathBuf) -> Result<DataFrame, rusqlite::Error> {
 
 
     let lookup = String::from("SELECT id, path, name, status, workflowRepo, workflowUser, workflowCommit, workflowVersion, createdAt, updatedAt FROM bs");
@@ -121,7 +121,7 @@ pub fn validate_qualified_analysis_workflow(runid: &String, polardb: &DataFrame,
 pub fn validate_db_entry(runid: &String, polardb: &DataFrame) -> bool {
 
     let stacked = get_db_id_entry(runid, polardb);
-    println!("{:?}",stacked);
+    //println!("{:?}",stacked);
 
     let row_count = &stacked.as_ref().unwrap().height(); // &stacked.unwrap().height();
     if row_count == &(1 as usize) {
@@ -180,13 +180,52 @@ pub fn print_appdb(df: &DataFrame) {
 }
 
 
-pub fn dbmanager(epi2me_instances: &DataFrame, list: &bool) {
+pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runid: &Option<String>, status: &Option<String>) {
     println!("Database functionality called ...");
-
 
     if *list {
         println!("Listing databases");
         print_appdb(epi2me_instances);
+    } else if runid.is_some() && status.is_some() {
+        println!("updating status ....");
+        let runid_str = &runid.as_ref().unwrap().to_string();
+        // validate the specified runid - return if nonsense
+        if !validate_db_entry(&runid_str, epi2me_instances) {
+            return;
+        }
+        // define collection of allowed terms
+        let status_terms = vec!["UNKNOWN", "COMPLETED", "ERROR"];
+        // check that the status fits within a sensible predefined vocabulary
+        if !status_terms.contains(&status.as_ref().unwrap().as_str()) {
+            println!("status [{}] is not an allowed term - {:?}", &status.as_ref().unwrap().as_str(), status_terms);
+            return;
+        }
+
+        let stacked = get_db_id_entry(runid_str, epi2me_instances).unwrap();
+        let z = get_zero_val(&stacked, &String::from("id"));
+        println!("using database entry id [{}]", z);
+
+        let connection = Connection::open(&path);
+        if connection.is_ok() {
+            let conn = connection.unwrap();
+            let stmt = conn.prepare("UPDATE bs SET status = ?1 WHERE id = ?2");
+            if stmt.is_ok() {
+                let qq = stmt.unwrap().execute(&[&status.as_ref().unwrap().as_str(), &z.as_str()]);
+
+                if qq.is_ok() {
+                    println!("Has this worked?");
+                } else {
+                    println!("fubar with the qq");
+                    println!("{:?}", qq.err());
+                }
+            } else {
+                println!("fubar creating STMT");
+            }
+        } else {
+            println!("fubar crearing db connection");
+        }
+        
+        
     }
 
 }
