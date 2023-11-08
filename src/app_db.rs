@@ -180,6 +180,33 @@ pub fn print_appdb(df: &DataFrame) {
 }
 
 
+fn field_update(path: &PathBuf, epi2me_instances: &DataFrame, runid_str: &String, key: &str, val: &str) {
+    let stacked = get_db_id_entry(runid_str, epi2me_instances).unwrap();
+    let z = get_zero_val(&stacked, &String::from("id"));
+    println!("using database entry id [{}]", z);
+
+    let connection = Connection::open(&path);
+    if connection.is_err() {
+        println!("fubar creating db connection");
+        return;
+    }
+
+    let conn = connection.unwrap();
+    let sql = format!("UPDATE bs SET {} = ?1 WHERE id = ?2", key);
+    let stmt = conn.prepare(sql.as_str());
+    if stmt.is_err() {
+        println!("fubar creating STMT");
+        return;
+    }
+    
+    let qq = stmt.unwrap().execute(&[val, &z.as_str()]);
+    if qq.is_err() {
+        println!("fubar with the qq");
+        println!("{:?}", qq.err());
+    }
+}
+
+
 pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runid: &Option<String>, status: &Option<String>) {
     println!("Database functionality called ...");
 
@@ -200,31 +227,8 @@ pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runi
             println!("status [{}] is not an allowed term - {:?}", &status.as_ref().unwrap().as_str(), status_terms);
             return;
         }
+        field_update(path, epi2me_instances, runid_str, "status", &status.as_ref().unwrap().as_str());
 
-        let stacked = get_db_id_entry(runid_str, epi2me_instances).unwrap();
-        let z = get_zero_val(&stacked, &String::from("id"));
-        println!("using database entry id [{}]", z);
-
-        let connection = Connection::open(&path);
-        if connection.is_ok() {
-            let conn = connection.unwrap();
-            let stmt = conn.prepare("UPDATE bs SET status = ?1 WHERE id = ?2");
-            if stmt.is_ok() {
-                let qq = stmt.unwrap().execute(&[&status.as_ref().unwrap().as_str(), &z.as_str()]);
-
-                if qq.is_ok() {
-                    println!("Has this worked?");
-                } else {
-                    println!("fubar with the qq");
-                    println!("{:?}", qq.err());
-                }
-            } else {
-                println!("fubar creating STMT");
-            }
-        } else {
-            println!("fubar crearing db connection");
-        }
-        
         
     }
 
