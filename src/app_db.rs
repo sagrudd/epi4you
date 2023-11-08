@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Result};
 use polars::prelude::*;
-use std::env;
+use std::{env, fs};
 use std::path::PathBuf;
 use crate::manifest::Epi2meDesktopAnalysis;
 use crate::workflow;
@@ -207,12 +207,47 @@ fn field_update(path: &PathBuf, epi2me_instances: &DataFrame, runid_str: &String
 }
 
 
-pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runid: &Option<String>, status: &Option<String>) {
+fn drop_epi2me_instance(path: &PathBuf, epi2me_instances: &DataFrame, runid_str: &String) {
+    let stacked = get_db_id_entry(runid_str, epi2me_instances).unwrap();
+    let z = get_zero_val(&stacked, &String::from("id"));
+    let y = get_zero_val(&stacked, &String::from("path"));
+    println!("using database entry id [{}] - files at [{}]", z, y);
+    let connection = Connection::open(&path);
+    if connection.is_err() {
+        println!("fubar creating db connection");
+        return;
+    }
+
+    let conn = connection.unwrap();
+    let qq = conn.execute("DELETE from bs where ID = ?1", &[&z.as_str()]);
+    if qq.is_err() {
+        println!("Error with delete from table - {:?}", qq.err());
+        return;
+    }
+
+    let dd = fs::remove_dir_all(y.as_str());
+    if dd.is_err() {
+        println!("issue with deleting files at [{}]", y.as_str());
+    }
+    
+}
+
+
+pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runid: &Option<String>, status: &Option<String>, delete: &bool, rename: &Option<String>) {
     println!("Database functionality called ...");
 
     if *list {
         println!("Listing databases");
         print_appdb(epi2me_instances);
+        return;
+    } else if *delete && runid.is_some() {
+        println!("dropping instance from database ....");
+        // validate the specified runid - return if nonsense
+        let runid_str = &runid.as_ref().unwrap().to_string();
+        if !validate_db_entry(&runid_str, epi2me_instances) {
+            return;
+        }
+        drop_epi2me_instance(path, epi2me_instances, runid_str);
     } else if runid.is_some() && status.is_some() {
         println!("updating status ....");
         let runid_str = &runid.as_ref().unwrap().to_string();
@@ -230,6 +265,14 @@ pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runi
         field_update(path, epi2me_instances, runid_str, "status", &status.as_ref().unwrap().as_str());
 
         
+    } else if runid.is_some() && rename.is_some() {
+        println!("renaming instance ....");
+        let runid_str = &runid.as_ref().unwrap().to_string();
+        // validate the specified runid - return if nonsense
+        if !validate_db_entry(&runid_str, epi2me_instances) {
+            return;
+        }
+        field_update(path, epi2me_instances, runid_str, "name", &rename.as_ref().unwrap().as_str());
     }
 
 }

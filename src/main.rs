@@ -40,6 +40,14 @@ enum Datatypes {
         /// modify status field
         #[arg(short, long, )]
         status: Option<String>,
+
+        /// drop database entries
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        delete: bool,
+
+        /// rename EPI2ME Desktop analysis
+        #[arg(short, long)]
+        rename: Option<String>,
     },
 
 
@@ -108,8 +116,8 @@ fn main() {
 
             match &cliargs.command {
 
-                Some(Datatypes::Database { list, runid, status }) => {
-                    dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status);
+                Some(Datatypes::Database { list, runid, status, delete, rename }) => {
+                    dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename);
                 },
 
                 Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid }) => {
