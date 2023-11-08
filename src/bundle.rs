@@ -14,7 +14,7 @@ use std::io::{BufReader, Read};
 
 use crate::epi2me_db;
 use crate::json::{get_manifest_str, write_manifest_str};
-use crate::manifest::MANIFEST_JSON;
+use crate::manifest::{MANIFEST_JSON, Epi2MeManifest, touch_manifest};
 use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2MeContent, FileManifest}, app_db, epi2me_tar};
 
 
@@ -71,6 +71,18 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
 
         if zz.is_some() {
 
+            // we need two paths here - the manifest is either new or being reused ...
+            if is_nascent_manifest(&manifest) {
+                // prepare_new_manifest();
+                println!("This is a nascent manifest");
+            } else {
+                // otherwise this EPI2ME object has already been packaged / unpackaged ...
+                println!("This manifest is being reused");
+                // add some history to the manifest to note that it is being repacked ...
+
+                touch_manifest(&mut manifest)
+            }
+
             let mut vehicle = zz.unwrap();
 
             // load the files into the Epi2meDesktopAnalysis struct
@@ -94,29 +106,24 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
                         let mut parent = e.clone();
                         let _ = parent.pop();
 
+
+                        let relative_path = clip_relative_path(&e, &local_prefix);
+                        //println!("{}", &fp);
+
+                        let checksum = sha256_digest(&fp);
                         
+                        //println!("file [{}] with checksum [{}]", &fp, &vv);
+                        let file_size = e.metadata().unwrap().len();
+                        files_size += file_size;
 
-                        //let mut relative_path = PathBuf::from(e.strip_prefix(&local_prefix).unwrap());
-                        //let _ = relative_path.pop();
-
-
-                    let relative_path = clip_relative_path(&e, &local_prefix);
-                    //println!("{}", &fp);
-
-                    let checksum = sha256_digest(&fp);
-                    
-                    //println!("file [{}] with checksum [{}]", &fp, &vv);
-                    let file_size = e.metadata().unwrap().len();
-                    files_size += file_size;
-
-                    vehicle.files.push(FileManifest {
-                        filename: String::from(e.file_name().unwrap().to_os_string().to_str().unwrap()),
-                        relative_path: String::from(relative_path.clone().to_string_lossy().to_string()),
-                        size: file_size,
-                        md5sum: checksum,
-                    })
+                        vehicle.files.push(FileManifest {
+                            filename: String::from(e.file_name().unwrap().to_os_string().to_str().unwrap()),
+                            relative_path: String::from(relative_path.clone().to_string_lossy().to_string()),
+                            size: file_size,
+                            md5sum: checksum,
+                        })
+                    }
                 }
-            }
             }
 
             let filecount = vehicle.files.len();
@@ -148,6 +155,26 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
             
         }
     }
+}
+
+
+fn is_nascent_manifest(manifest: &Epi2MeManifest) -> bool {
+    // if the manifest has a non-default checksum then it is unlikely to be new
+    if manifest.signature == String::from("undefined") {
+        return true;
+    }
+    return false;
+}
+
+
+
+fn is_file_in_manifest(e: &PathBuf, f: &Vec<FileManifest>, local_prefix: &PathBuf) -> bool {
+    println!("looking for entry == {:?}", e);
+
+    let relative_path = clip_relative_path(&e, &local_prefix);
+
+
+    return false;
 }
 
 

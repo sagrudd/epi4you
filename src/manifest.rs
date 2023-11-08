@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, fs::File};
 use serde::{Serialize, Deserialize};
 use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::wrangle_manifest};
 
@@ -119,10 +119,16 @@ impl Default for Epi2MeManifest {
 }
 
 
+pub fn get_manifest_path(source: &PathBuf) -> PathBuf {
+    let mut manifest = source.clone();
+    manifest.push(MANIFEST_JSON);
+    return manifest;
+} 
+
+
+
 pub fn get_manifest(source: &PathBuf) -> Option<Epi2MeManifest> {
-  
-        let mut manifest = source.clone();
-        manifest.push(MANIFEST_JSON);
+        let manifest = get_manifest_path(source);
         if !manifest.exists() {
             // we need to create one
             println!("creating a new manifest");
@@ -140,10 +146,23 @@ pub fn get_manifest(source: &PathBuf) -> Option<Epi2MeManifest> {
             return Some(man);
         } else {
             // we should load the manifest
+
+            let json_file = File::open(manifest).expect("file not found");
+
+            let epi2me_manifest: Epi2MeManifest =
+                serde_json::from_reader(json_file).expect("error while reading json");
+            return Some(epi2me_manifest);
         }
 
-        return None;
 }
+
+pub fn touch_manifest(man: &mut Epi2MeManifest) {
+
+    let touch_prov = append_provenance(String::from("manifest_touched"), None, None, String::from(""));
+    man.provenance.push(touch_prov);
+
+}
+
 
 
 pub fn load_manifest_from_tarball() -> Option<Epi2MeManifest> {
