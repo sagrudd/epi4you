@@ -59,3 +59,14 @@ these intermediate files for analysis instances that have completed successfully
 ```
 epi4you database --housekeeping
 ```
+
+### Duplicating existing analysis runs
+
+There are times when you'd like to be creative with existing datasets. This is often centred around customer demonstrations or
+the need to package existing command line runs in the GUI. There is a `--clone` parameter that can be used to clone existing
+workflows; this just copies one analysis into a new folder, updates the metadata and adds the corresponding entry to the
+database.
+
+```
+epi4you database --runid 01HESF8SQ43RT9MVEFARS3SW14 --clone cloned_workflow
+```

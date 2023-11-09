@@ -1,6 +1,5 @@
 use chrono::{Local, DateTime};
 use fs_extra::{copy_items, dir};
-use regex::Regex;
 use rusqlite::{Connection, Result};
 use polars::prelude::*;
 use ulid::Ulid;
