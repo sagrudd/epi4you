@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use app_db::dbmanager;
 use clap::{Parser, Subcommand, ArgAction};
+use docker::docker_agent;
 use manifest::load_manifest_from_tarball;
 
 mod epi2me_db;
@@ -13,6 +14,7 @@ mod manifest;
 mod provenance;
 mod workflow;
 mod epi2me_tar;
+mod docker;
 
 use std::env;
 
@@ -34,7 +36,7 @@ enum Datatypes {
         list: bool,
 
         /// define EPI2ME Desktop analysis
-        #[arg(short, long)]
+        #[arg(short = 'r', long)]
         runid: Option<String>,
 
         /// modify status field
@@ -46,8 +48,14 @@ enum Datatypes {
         delete: bool,
 
         /// rename EPI2ME Desktop analysis
-        #[arg(short, long)]
+        #[arg(short = 'n', long)]
         rename: Option<String>,
+    },
+
+    Docker {
+        /// define EPI2ME Desktop analysis
+        #[arg(short, long)]
+        project: Option<String>,
     },
 
 
@@ -115,6 +123,10 @@ fn main() {
         if df.is_ok() {
 
             match &cliargs.command {
+
+                Some(Datatypes::Docker { project }) => {
+                    docker_agent(&epi2me, project);
+                },
 
                 Some(Datatypes::Database { list, runid, status, delete, rename }) => {
                     dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename);

@@ -27,3 +27,13 @@ we can mark this as `COMPLETED` with
 ```
 epi4you database --runid suspicious_khorana --status ERROR
 ```
+
+### Rename a workflow instance
+
+While it is possible to rename a workflow instance through the GUI, sometimes things are just cleaner through the command-line.
+Using the `--rename` option it is possible to quickly rename an existing workflow based on either the workflow ID or name; please
+note that a restart of the desktop application is required for the changes to be seen.
+
+```
+epi4you database --runid 01HEQSF512CK2VK4YY07CEY2B9 --rename ARTIC_DEMO
+```

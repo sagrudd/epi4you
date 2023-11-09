@@ -9,6 +9,11 @@ pub struct Epi2meSetup {
     pub epi2path: PathBuf,
     pub epi2db_path: PathBuf,
     pub epi2wf_dir: PathBuf,
+    pub arch: String,
+}
+
+fn get_platformstr() -> String {
+    return String::from(std::env::consts::ARCH);
 }
 
 
@@ -28,7 +33,7 @@ pub fn find_db() -> Option<Epi2meSetup> {
             os = Some(String::from("macOS"));
             path = macos;
         } else if linux.is_some() {
-            os = Some(String::from("macOS"));
+            os = Some(String::from("linux"));
             path = linux;
         }
 
@@ -43,6 +48,7 @@ pub fn find_db() -> Option<Epi2meSetup> {
                     epi2path: path.unwrap(),
                     epi2db_path: db_path.unwrap(),
                     epi2wf_dir: wf_dir.unwrap(),
+                    arch: get_platformstr(),
                 };
 
                 return Some(vehicle);

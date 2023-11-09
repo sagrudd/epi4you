@@ -256,7 +256,7 @@ pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runi
             return;
         }
         // define collection of allowed terms
-        let status_terms = vec!["UNKNOWN", "COMPLETED", "ERROR"];
+        let status_terms = vec!["UNKNOWN", "COMPLETED", "ERROR", "STOPPED_BY_USER"];
         // check that the status fits within a sensible predefined vocabulary
         if !status_terms.contains(&status.as_ref().unwrap().as_str()) {
             println!("status [{}] is not an allowed term - {:?}", &status.as_ref().unwrap().as_str(), status_terms);
