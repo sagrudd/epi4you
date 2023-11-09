@@ -47,3 +47,15 @@ files.
 ```
 epi4you database --runid 01HEQR5KECW3KENBY9JFKEKTYE --delete
 ```
+
+### Workflow instance housekeeping
+
+Nextflow places a collection of intermediate files in its working directory (in a subfolder named `work` in each
+instance). These intermediate files are kept by EPI2ME (intentionally) whilst the result files are copied into a separate folder. 
+While there may some useful files within the `work` intermediate folder, a significant amount of disk space can be freed by
+removing these folders - this may be hundreds of Gb for `wf-human-variation` analyses. A `housekeeping` exercise will remove
+these intermediate files for analysis instances that have completed successfully or been stopped by a user.
+
+```
+epi4you database --housekeeping
+```

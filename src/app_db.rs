@@ -233,13 +233,63 @@ fn drop_epi2me_instance(path: &PathBuf, epi2me_instances: &DataFrame, runid_str:
 }
 
 
-pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runid: &Option<String>, status: &Option<String>, delete: &bool, rename: &Option<String>) {
+fn get_run_status(id: &String, epi2me_instances: &DataFrame) -> Option<String> {
+
+    let x = validate_db_entry(id, epi2me_instances );
+    if !x {
+        return None;
+    }
+    let df2 = filter_df_by_value(epi2me_instances, &String::from("id"), id).unwrap();
+    let val = get_zero_val(&df2, &String::from("status"));
+    return Some(val);
+}
+
+
+fn housekeeper(epi2me_instances: &DataFrame) {
+    // extract all unique workflow ids
+
+    let s = epi2me_instances.column("id").unwrap().clone();
+    let chunked_array: Vec<Option<&str>> = s.utf8().unwrap().into_iter().collect();
+    for id in chunked_array.iter() {
+        let id2 = String::from(id.unwrap());
+        
+        let runstatus = get_run_status(&id2, epi2me_instances);
+
+        if runstatus.is_some() {
+            let runstatus_str = runstatus.as_ref().unwrap();
+
+            let status_terms = vec!["UNKNOWN", "COMPLETED", "STOPPED_BY_USER"];
+            // check that the status fits within a sensible predefined vocabulary
+            if status_terms.contains(&runstatus.as_ref().unwrap().as_str()) {
+                let instancepath = get_qualified_analysis_path(&id2, epi2me_instances);
+                println!("id [{}] has status [{:?}] --> {:?}", id2, runstatus_str, instancepath);
+
+                let paths = fs::read_dir(instancepath).unwrap();
+                for path in paths {
+                    let xpath = path.unwrap().path();
+                    if xpath.ends_with("work") && xpath.is_dir() {
+                        println!("Name: {}", xpath.display());
+
+                        let dd = fs::remove_dir_all(&xpath);
+                        if dd.is_err() {
+                            println!("issue with deleting files at [{:?}]", &xpath);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runid: &Option<String>, status: &Option<String>, delete: &bool, rename: &Option<String>, housekeeping: &bool) {
     println!("Database functionality called ...");
 
     if *list {
         println!("Listing databases");
         print_appdb(epi2me_instances);
         return;
+    } else if *housekeeping {
+        housekeeper(epi2me_instances);
     } else if *delete && runid.is_some() {
         println!("dropping instance from database ....");
         // validate the specified runid - return if nonsense
@@ -256,7 +306,7 @@ pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runi
             return;
         }
         // define collection of allowed terms
-        let status_terms = vec!["UNKNOWN", "COMPLETED", "ERROR", "STOPPED_BY_USER"];
+        let status_terms = vec!["UNKNOWN", "COMPLETED", "ERROR", "STOPPED_BY_USER", "RUNNING"];
         // check that the status fits within a sensible predefined vocabulary
         if !status_terms.contains(&status.as_ref().unwrap().as_str()) {
             println!("status [{}] is not an allowed term - {:?}", &status.as_ref().unwrap().as_str(), status_terms);

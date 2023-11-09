@@ -50,6 +50,10 @@ enum Datatypes {
         /// rename EPI2ME Desktop analysis
         #[arg(short = 'n', long)]
         rename: Option<String>,
+
+        /// drop database entries
+        #[arg(short = 'k', long, action=ArgAction::SetTrue)]
+        housekeeping: bool,
     },
 
     Docker {
@@ -128,8 +132,8 @@ fn main() {
                     docker_agent(&epi2me, project);
                 },
 
-                Some(Datatypes::Database { list, runid, status, delete, rename }) => {
-                    dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename);
+                Some(Datatypes::Database { list, runid, status, delete, rename, housekeeping }) => {
+                    dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename, housekeeping);
                 },
 
                 Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid }) => {
