@@ -37,3 +37,13 @@ note that a restart of the desktop application is required for the changes to be
 ```
 epi4you database --runid 01HEQSF512CK2VK4YY07CEY2B9 --rename ARTIC_DEMO
 ```
+
+### Delete an unsuccessful or redundant analysis
+
+As with the `--rename` functionality presented above, it is simple to delete workflows from the GUI; it is perhaps simpler to
+run from the command line. This will remove the corresponding entry from the database and will remove the linked folder and its
+files.
+
+```
+epi4you database --runid 01HEQR5KECW3KENBY9JFKEKTYE --delete
+```
