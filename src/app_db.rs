@@ -1,5 +1,9 @@
+use chrono::{Local, DateTime};
+use fs_extra::{copy_items, dir};
+use regex::Regex;
 use rusqlite::{Connection, Result};
 use polars::prelude::*;
+use ulid::Ulid;
 use std::{env, fs};
 use std::path::PathBuf;
 use crate::manifest::Epi2meDesktopAnalysis;
@@ -8,7 +12,7 @@ use crate::workflow;
 
 #[allow(dead_code)]
 #[allow(non_snake_case)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Epi2MeAnalysis {
     id: String,
     path: String,
@@ -137,6 +141,26 @@ pub fn validate_db_entry(runid: &String, polardb: &DataFrame) -> bool {
     return false;
 }
 
+fn get_instance_struct(runid: &String, polardb: &DataFrame) -> Option<Epi2MeAnalysis> {
+    if validate_db_entry(runid, polardb) {
+        let stacked = get_db_id_entry(runid, polardb).unwrap();
+        let x = Epi2MeAnalysis { 
+            id: get_zero_val(&stacked, &String::from("id")),
+            path: get_zero_val(&stacked, &String::from("path")),
+            name: get_zero_val(&stacked, &String::from("name")),
+            status: get_zero_val(&stacked, &String::from("status")),
+            workflowRepo: get_zero_val(&stacked, &String::from("workflowRepo")),
+            workflowUser: get_zero_val(&stacked, &String::from("workflowUser")),
+            workflowCommit: get_zero_val(&stacked, &String::from("workflowCommit")),
+            workflowVersion: get_zero_val(&stacked, &String::from("workflowVersion")),
+            createdAt: get_zero_val(&stacked, &String::from("createdAt")),
+            updatedAt: get_zero_val(&stacked, &String::from("updatedAt")),
+        };
+        return Some(x);
+    }
+    return None;
+}
+
 
 pub fn get_analysis_struct(runid: &String, polardb: &DataFrame) -> Option<Epi2meDesktopAnalysis> {
     if validate_db_entry(runid, polardb) {
@@ -232,9 +256,51 @@ fn drop_epi2me_instance(path: &PathBuf, epi2me_instances: &DataFrame, runid_str:
     
 }
 
+fn insert_into_db(path: &PathBuf, epi2meitem: &Epi2MeAnalysis) {
+    let connection = Connection::open(&path);
+    if connection.is_err() {
+        println!("fubar creating db connection");
+        return;
+    }
+
+    let conn = connection.unwrap();
+
+    let insert = String::from("INSERT into bs (id, path, name, status, workflowRepo, workflowUser, workflowCommit, workflowVersion, createdAt, updatedAt) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)");
+    let result = conn.execute(insert.as_str(), &[&epi2meitem.id,
+                                                                                &epi2meitem.path,
+                                                                                &epi2meitem.name,
+                                                                                &epi2meitem.status,
+                                                                                &epi2meitem.workflowRepo,
+                                                                                &epi2meitem.workflowUser,
+                                                                                &epi2meitem.workflowCommit,
+                                                                                &epi2meitem.workflowVersion,
+                                                                                &epi2meitem.createdAt,
+                                                                                &epi2meitem.updatedAt
+    ]);
+
+    if result.is_err() {
+        println!("failure --- \n{:?}", result.err());
+    }
+
+/*
+
+            id: get_zero_val(&stacked, &String::from("id")),
+            path: get_zero_val(&stacked, &String::from("path")),
+            name: get_zero_val(&stacked, &String::from("name")),
+            status: get_zero_val(&stacked, &String::from("status")),
+            workflowRepo: get_zero_val(&stacked, &String::from("workflowRepo")),
+            workflowUser: get_zero_val(&stacked, &String::from("workflowUser")),
+            workflowCommit: get_zero_val(&stacked, &String::from("workflowCommit")),
+            workflowVersion: get_zero_val(&stacked, &String::from("workflowVersion")),
+            createdAt: get_zero_val(&stacked, &String::from("createdAt")),
+            updatedAt: get_zero_val(&stacked, &String::from("updatedAt")),
+
+*/
+
+}
+
 
 fn get_run_status(id: &String, epi2me_instances: &DataFrame) -> Option<String> {
-
     let x = validate_db_entry(id, epi2me_instances );
     if !x {
         return None;
@@ -281,7 +347,32 @@ fn housekeeper(epi2me_instances: &DataFrame) {
     }
 }
 
-pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runid: &Option<String>, status: &Option<String>, delete: &bool, rename: &Option<String>, housekeeping: &bool) {
+
+fn resync_progress_json(source: &String, ulid: &String, newlid: &String) {
+
+    let file2mod = vec!["progress.json", "params.json", "launch.json"];
+    let paths = fs::read_dir(source).unwrap();
+    for path in paths {
+        let xpath = path.unwrap().path().clone();
+        let fname = xpath.file_name().unwrap().to_string_lossy().to_string();
+
+        if file2mod.contains(&fname.as_str()) {
+            println!("matching {:?}", xpath);
+
+            let contents = fs::read_to_string(&xpath).unwrap();
+            let updated = contents.as_str().replace(ulid, newlid);
+
+            let status = fs::write(&xpath, updated);
+            if status.is_err() {
+                println!("error with writing file - {:?}", status.err());
+            }
+        }
+
+    }
+}
+
+
+pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runid: &Option<String>, status: &Option<String>, delete: &bool, rename: &Option<String>, housekeeping: &bool, clone: &Option<String>) {
     println!("Database functionality called ...");
 
     if *list {
@@ -323,6 +414,55 @@ pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runi
             return;
         }
         field_update(path, epi2me_instances, runid_str, "name", &rename.as_ref().unwrap().as_str());
+    } else if clone.is_some() && runid.is_some() {
+        println!("cloning instance ....");
+        let runid_str = &runid.as_ref().unwrap().to_string();
+        // validate the specified runid - return if nonsense
+        if !validate_db_entry(&runid_str, epi2me_instances) {
+            return;
+        }
+        
+        let epi2meitem = get_instance_struct(runid_str, epi2me_instances);
+        if epi2meitem.is_some() {
+            let mut epi2meitem_x: Epi2MeAnalysis = epi2meitem.unwrap();
+            epi2meitem_x.id = Ulid::new().to_string();
+            epi2meitem_x.name = clone.as_ref().unwrap().to_string();
+
+            // create a new path for the analysis
+            let src_dir = epi2meitem_x.path.clone();
+            let mut dst_dir = PathBuf::from(epi2meitem_x.path.clone());
+            dst_dir.pop();
+            dst_dir.push(vec![epi2meitem_x.workflowRepo.clone(), epi2meitem_x.id.clone()].join("_"));
+            let dest_str = dst_dir.into_os_string().into_string().unwrap();
+            epi2meitem_x.path = dest_str.clone();
+
+            // we can (or should) also update the timestamps since this is a retouch ...
+            // e.g. 2023-11-09 07:20:43.492 +00:00
+            let local: DateTime<Local> = Local::now();
+            println!("NOW == {:?}", local);
+            epi2meitem_x.createdAt = local.to_string();
+            epi2meitem_x.updatedAt = local.to_string();
+
+            println!("new epi2meobj = {:?}", &epi2meitem_x);
+            insert_into_db(&path, &epi2meitem_x);
+            // and copy across the accompanying files ...
+            let mut from_paths: Vec<String> = Vec::new();
+            let paths = fs::read_dir(src_dir).unwrap();
+            for path in paths {
+                let xpath = path.unwrap().path().clone();
+                let zz = xpath.into_os_string().into_string().unwrap();
+                from_paths.push(zz);
+            }
+            let dest = dest_str.clone();
+            let mkdir = fs::create_dir(&dest);
+            println!("dest = {:?} = {:?}", dest, mkdir);
+            let opts = dir::CopyOptions::new();
+            let cp = copy_items(&from_paths, &dest, &opts);
+            println!("state = {:?}", cp);
+
+            resync_progress_json(&dest, runid_str, &epi2meitem_x.id.clone());
+            
+        }
     }
 
 }

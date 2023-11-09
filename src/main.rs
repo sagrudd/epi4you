@@ -54,6 +54,10 @@ enum Datatypes {
         /// drop database entries
         #[arg(short = 'k', long, action=ArgAction::SetTrue)]
         housekeeping: bool,
+
+        /// clone an existing EPI2ME Desktop analysis
+        #[arg(short, long)]
+        clone: Option<String>,
     },
 
     Docker {
@@ -132,8 +136,8 @@ fn main() {
                     docker_agent(&epi2me, project);
                 },
 
-                Some(Datatypes::Database { list, runid, status, delete, rename, housekeeping }) => {
-                    dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename, housekeeping);
+                Some(Datatypes::Database { list, runid, status, delete, rename, housekeeping, clone }) => {
+                    dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename, housekeeping, clone);
                 },
 
                 Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid }) => {
