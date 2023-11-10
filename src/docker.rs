@@ -3,6 +3,8 @@ use crate::{epi2me_db::Epi2meSetup, workflow::glob_path_by_wfname};
 use regex::Regex;
 use docker_api::{Docker, Result};
 use docker_api::opts::PullOpts;
+use docker_api::api::Image;
+use docker_api::opts::TagOpts;
 use futures::StreamExt;
 
 
@@ -127,6 +129,27 @@ pub fn new_docker() -> Result<Docker> {
 }
 
 
+async fn retag_image(installed: &String, requested: &String) {
+
+    println!("retagging image [{installed}] -> [{requested}]");
+
+    let docker = new_docker();
+    if docker.is_ok() {
+
+        let x = requested.split_once(":");
+        if x.is_some() {
+            let (repo, tag) = x.unwrap();
+            let tag_opts = TagOpts::builder().repo(repo).tag(tag).build();
+            let image = Image::new(docker.unwrap(), installed);
+            let status = image.tag(&tag_opts).await;
+            if status.is_err() {
+                eprintln!("Error: {:?}", status.err());
+            } 
+        }
+    }
+}
+
+
 async fn pull_container(container: &String) {
     let docker = new_docker();
         
@@ -151,7 +174,24 @@ async fn pull_container(container: &String) {
                             }
                         } else if status == "Downloading" {
                         } else {
-                            println!("{status}")
+                            println!("{status}");
+
+                            // can we capture the name of the container that has been pulled?
+                            // Status: Downloaded newer image for ontresearch/prokka:latest
+                            // Status: Downloaded newer image for ontresearch/wf-bacterial-genomes:latest
+                            // Status: Image is up to date for ontresearch/wf-common:latest
+
+                            let newer_image = "Status: Downloaded newer image for ";
+                            let up2da_image = "Status: Image is up to date for ";
+                            if status.starts_with(newer_image) {
+                                let installed_img = status.replace(newer_image, "");
+                                retag_image(&installed_img, container).await;
+                            } else if status.starts_with(up2da_image) {
+                                let installed_img = status.replace(up2da_image, "");
+                                retag_image(&installed_img, container).await;
+                            }
+
+                            
                         }
                     }
                         
