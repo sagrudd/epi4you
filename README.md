@@ -105,3 +105,16 @@ functionality is present for canonical samples
 ```
 epi4you docker --workflow wf-human-variation --pull
 ```
+
+### Export containers as tar files to defined location
+
+One of the biggest challenges to moving files around offline is getting the files exported as a sensible format - docker provides
+native functionality for export and load ...
+
+```
+epi4you docker --workflow wf-human-variation --export /tmp
+creating object = wf-human-variation.1.8.1.x86_64
+exporting [ontresearch/wf-human-variation-str:sha28799bc3058fa256c01c1f07c87f04e4ade1fcc1]
+exporting [ontresearch/wf-human-variation-snp:sha0d7e7e8e8207d9d23fdf50a34ceb577da364373e]
+...
+```
