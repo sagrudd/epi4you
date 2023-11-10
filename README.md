@@ -70,3 +70,13 @@ database.
 ```
 epi4you database --runid 01HESF8SQ43RT9MVEFARS3SW14 --clone cloned_workflow
 ```
+
+
+## Docker containers and EPI2ME
+
+There is a lot of interest in tools that can be used to facilitate the offline analysis of biological data. At the heart of the
+software is a massive collection of prepackaged data that includes a variety of containers that are supported for both docker
+and singularity. These software containers have the challenge that they are large, frequently updated, and are only available
+through internet connected resources. The `docker` tools provided here are intended to simplify the identification of docker
+containers associated with individual projects. These containers can then be installed and further packaged as offline
+accessible artifacts. 

@@ -281,21 +281,6 @@ fn insert_into_db(path: &PathBuf, epi2meitem: &Epi2MeAnalysis) {
         println!("failure --- \n{:?}", result.err());
     }
 
-/*
-
-            id: get_zero_val(&stacked, &String::from("id")),
-            path: get_zero_val(&stacked, &String::from("path")),
-            name: get_zero_val(&stacked, &String::from("name")),
-            status: get_zero_val(&stacked, &String::from("status")),
-            workflowRepo: get_zero_val(&stacked, &String::from("workflowRepo")),
-            workflowUser: get_zero_val(&stacked, &String::from("workflowUser")),
-            workflowCommit: get_zero_val(&stacked, &String::from("workflowCommit")),
-            workflowVersion: get_zero_val(&stacked, &String::from("workflowVersion")),
-            createdAt: get_zero_val(&stacked, &String::from("createdAt")),
-            updatedAt: get_zero_val(&stacked, &String::from("updatedAt")),
-
-*/
-
 }
 
 
