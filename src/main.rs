@@ -68,6 +68,10 @@ enum Datatypes {
         /// List project linked containers
         #[arg(short, long, action=ArgAction::SetTrue)]
         list: bool,
+
+        /// pull project linked containers
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        pull: bool,
     },
 
 
@@ -125,7 +129,8 @@ enum Datatypes {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cliargs = Args::parse();
 
     let epi2me_opt = epi2me_db::find_db();
@@ -136,8 +141,8 @@ fn main() {
 
             match &cliargs.command {
 
-                Some(Datatypes::Docker { workflow: project, list }) => {
-                    docker_agent(&epi2me, project, list);
+                Some(Datatypes::Docker { workflow: project, list, pull }) => {
+                    docker_agent(&epi2me, project, list, pull).await;
                 },
 
                 Some(Datatypes::Database { list, runid, status, delete, rename, housekeeping, clone }) => {

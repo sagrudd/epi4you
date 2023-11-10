@@ -95,3 +95,13 @@ nanoporetech/dorado:sha1433bfc3146fd0dc94ad9648452364f2327cf1b0
 ontresearch/wf-cnv:sha428cb19e51370020ccf29ec2af4eead44c6a17c2
 ...
 ```
+
+### Pull workflow required containers
+
+Using the docker containers as identified in the code above, this code can populate the docker resources with the appropriate
+containers. This will create a large amount of internet usage for a few minutes ... The progress is a bit ugly but the
+functionality is present for canonical samples
+
+```
+epi4you docker --workflow wf-human-variation --pull
+```

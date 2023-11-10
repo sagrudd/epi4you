@@ -1,35 +1,10 @@
 use std::{path::PathBuf, fs, collections::HashMap};
 use crate::{epi2me_db::Epi2meSetup, workflow::glob_path_by_wfname};
 use regex::Regex;
+use docker_api::{Docker, Result};
+use docker_api::opts::PullOpts;
+use futures::StreamExt;
 
-fn get_workflow_version() -> String {
-    return "undefined".to_string();
-}
-
-fn get_filename(epi2me: &Epi2meSetup, workflow_path: PathBuf) -> String {
-    let fname = format!("wf_workflow_{}_{}", epi2me.arch, get_workflow_version());
-    return fname;
-}
-
-
-pub fn config2containers(path: PathBuf) {
-
-}
-
-
-pub fn pullcontainers() {
-
-}
-
-
-pub fn containers2tar() {
-
-}
-
-
-pub fn tar2containers() {
-
-}
 
 
 fn string_clip(src: String) -> String {
@@ -139,13 +114,101 @@ fn extract_containers(config: &HashMap<String, String>) -> Vec<String> {
 
 
 fn identify_containers(pb: &PathBuf) -> Vec<String> {
-    let contents = fs::read_to_string(&pb).unwrap();
+    let mut contents = fs::read_to_string(&pb).unwrap();
+    contents = contents.replace(" { ", " {\n");
+    contents = contents.replace("}\n", " \n}\n");
     // println!("{}", &contents);
     let config = nextflow_parser(&contents);
     return extract_containers(&config);
 }
 
-pub fn docker_agent(epi2me: &Epi2meSetup, workflow_opt: &Option<String>, list: &bool) {
+pub fn new_docker() -> Result<Docker> {
+    Ok(Docker::unix("/var/run/docker.sock"))
+}
+
+
+async fn pull_container(container: &String) {
+    let docker = new_docker();
+        
+    if docker.is_ok() {
+        let opts = PullOpts::builder().image(container).build();
+
+        let images = docker.unwrap().images();
+        let mut stream = images.pull(&opts);
+
+        while let Some(pull_result) = stream.next().await {
+            match pull_result {
+                Ok(output) => {
+                    let x = format!("{output:?}");
+
+                    let ostatus = omatch(r#"status: "[^"]+""#, &x);
+                    if ostatus.is_some() {
+                        let status = ostatus.unwrap();
+                        if status == "Extracting" {
+                            let oprogress = omatch(r#"progress: [^\)]+\)"#, &x);
+                            if oprogress.is_some() {
+                                println!("{}", oprogress.unwrap());
+                            }
+                        } else if status == "Downloading" {
+                        } else {
+                            println!("{status}")
+                        }
+                    }
+                        
+
+
+                },
+                Err(e) => eprintln!("{e}"),
+            }
+        }
+    } else {
+
+        println!("docker failure?");
+    }
+}
+
+
+fn unsome(s: &str) -> String {
+    if s.starts_with(r#"Some(""#) {
+        return String::from(&s[6..s.len()-2]);
+    }
+    return String::from(s);
+}
+
+
+fn unlabel(s: &str, label: &str) -> String {
+    let mut unlabelled = String::from(s.replace(label, "").trim());
+    while unlabelled.starts_with(r#"""#) {
+        unlabelled = String::from(&unlabelled[1..unlabelled.len()-1]);
+    }
+    if unlabelled.starts_with("Some(") {
+        return unsome(&unlabelled);
+    }
+    return String::from(unlabelled);
+}
+
+
+fn omatch(key: &str, txt: &str) -> Option<String> {
+    //println!("looking for || {}", key);
+    let re_status = Regex::new(key).unwrap();
+    let lmatch = re_status.find(&txt);
+    if lmatch.is_some() {
+        let matched = lmatch.unwrap();
+        let found = matched.as_str();
+        //println!("omatch [{}] --> [{}]", key, found);
+        if key.ends_with(r#"""#) || key.ends_with(r#")"#) {
+            let olabel = omatch("^[^:]+:", &found);
+            if olabel.is_some() {
+                return Some(unlabel(found, &olabel.unwrap()));
+            }
+        }
+        return Some(String::from(found));
+    }
+    println!("returning None!");
+    return None;
+}
+
+pub async fn docker_agent(epi2me: &Epi2meSetup, workflow_opt: &Option<String>, list: &bool, pull: &bool) {
 
     if !workflow_opt.is_some() {
         println!("docker methods require a --workflow pointer to a workflow");
@@ -169,14 +232,30 @@ pub fn docker_agent(epi2me: &Epi2meSetup, workflow_opt: &Option<String>, list: &
         valid = true;
     }
 
+
+
+
+
+
+
+
+
+
     if !valid {
         println!("Cannot continue - the --workflow defined cannot be resolved");
     }
 
     if *list {
-        for container in containers {
+        for container in &containers {
             println!("{}", container);
         }
+    }
+
+    if *pull {
+            for container in &containers {
+                println!("pulling [{}]", container);
+                pull_container(container).await;
+            }
     }
 
 
