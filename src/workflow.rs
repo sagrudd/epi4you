@@ -33,7 +33,7 @@ fn is_folder_wf_compliant(wffolder: &PathBuf) -> bool {
     for path in paths {
         let fname = &path.unwrap().file_name().to_string_lossy().to_string();
         if required_files.contains(&fname.as_str()) {
-            println!("found {:?}", fname);
+            // println!("found {:?}", fname);
             counter += 1;
         }
     }
@@ -56,7 +56,7 @@ pub fn glob_path_by_wfname(epi2me: &Epi2meSetup, project: &String) -> Option<Pat
             let entry_item = entry.unwrap();
             // ensure that the folder found is actually a nextflow folder (nanopore flavoured)
             if is_folder_wf_compliant(&entry_item) {
-                println!("folder picked == {:?}", entry_item);
+                // println!("folder picked == {:?}", entry_item);
                 return Some(entry_item)
             }
         }

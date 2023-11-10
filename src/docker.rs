@@ -32,6 +32,27 @@ pub fn tar2containers() {
 }
 
 
+fn string_clip(src: String) -> String {
+    let mut start = 0 as usize;
+    let mut end = src.len();
+
+    let first = src.chars().next().unwrap();
+    let last = src.chars().nth(end-1).unwrap();
+
+    match first {
+        '\'' => start += 1,
+        '\"' => start += 1,
+        _ => start += 0,
+    };
+
+    match last {
+        '\'' => end -= 1,
+        '\"' => end -= 1,
+        _ => end -= 0,
+    };
+
+    return String::from(&src[start..end]);
+}
 
 fn nextflow_parser(contents: &String) -> HashMap<String, String> {
 
@@ -46,12 +67,7 @@ fn nextflow_parser(contents: &String) -> HashMap<String, String> {
         let l2 = line.trim();
         let s = String::from(l2);
 
-        println!("{}",s);
-
-        /*let idx = s.rfind("//");
-        if idx.is_some() {
-            l2 = &s[..idx.unwrap()].trim();
-        }*/
+        // println!("{}",s);
 
         if String::from(l2).starts_with("//") {
             // skip it ...
@@ -68,22 +84,22 @@ fn nextflow_parser(contents: &String) -> HashMap<String, String> {
         } else if String::from(l2).ends_with("[") {
             let (field, _value) = s.split_at(s.find(" = ").unwrap());
             cache_key = String::from(field.trim());
-            println!("setting cache_key = [{}]", &cache_key);
+            // println!("setting cache_key = [{}]", &cache_key);
         } else if String::from(l2).starts_with("]") {
-            println!("closing cache_key = [{}]", &cache_key);
+            // println!("closing cache_key = [{}]", &cache_key);
             let merged = cache.join("-");
             let merged_key = vec![key.clone(), vec![cache_key]].concat().join(".");
             nextflow_config.insert(merged_key, merged);
             cache_key = String::from("");
             cache = Vec::new();
         } else if cache_key.len() > 0 {
-            println!("appending cache");
+            // println!("appending cache");
             cache.push(String::from(l2));
         } else if String::from(l2).contains(" = ") {
-            println!("keypair to extract");
+            // println!("keypair to extract");
             let (field, value) = s.split_at(s.find(" = ").unwrap());
             let val = String::from(&value[2..]);
-            let val2 = String::from(val.trim());
+            let val2 = string_clip(String::from(val.trim()));
             let merged_key = vec![key.clone(), vec![String::from(field.trim())]].concat().join(".");
             nextflow_config.insert(merged_key, String::from(val2));
         } else {
@@ -91,71 +107,77 @@ fn nextflow_parser(contents: &String) -> HashMap<String, String> {
         }
         
     }
-
-    /*
-    for key in nextflow_config.keys() {
-        let val = nextflow_config.get(key);
-        println!("config k={} v={}", key, val.unwrap());
-    }
-    */
-
     return nextflow_config;
 
 }
 
 
-fn extract_containers(config: &HashMap<String, String>) {
-    let prefix = String::from("process");
+fn extract_containers(config: &HashMap<String, String>) -> Vec<String> {
+    let mut container_vec: Vec<String> = Vec::new();
+    let prefix = String::from("process.");
     let suffix = String::from("container");
     for key in config.keys() {
         if key.starts_with(&prefix) && key.ends_with(&suffix) { 
-            let container_str = config.get(key).unwrap();
-
-            let re = Regex::new(r"\$\{[^\}]+\}").unwrap();
-            let bb = re.captures(container_str);
-            if bb.is_some() {
-                let bb2 = bb.unwrap();
-                let found = bb2.get(0).unwrap().as_str();
-                let found2 = &found[2..found.len()-1];
-                println!("something ... {:?}", found2);
-
-
+            let container_str = String::from(config.get(key).unwrap());
+            let mut mod_container_str = container_str.clone();
+            let re = Regex::new(r"\$\{[^\}]+\}").unwrap(); // 
+            
+            for matched in re.find_iter(&container_str) {
+                let found = matched.as_str();
+                let value = config.get(&found[2..found.len()-1]);
+                if value.is_some() {
+                    mod_container_str = mod_container_str.replace(found, value.unwrap());
+                }
             }
-
-            println!("container [{:?}]", container_str.as_str());
+            // println!("container == [{}]", mod_container_str);
+            container_vec.push(mod_container_str);
         }
     }
+    return container_vec;
 }
 
 
 
-fn identify_containers(pb: &PathBuf) {
+fn identify_containers(pb: &PathBuf) -> Vec<String> {
     let contents = fs::read_to_string(&pb).unwrap();
     // println!("{}", &contents);
     let config = nextflow_parser(&contents);
-    let containers = extract_containers(&config);
+    return extract_containers(&config);
 }
 
-pub fn docker_agent(epi2me: &Epi2meSetup, projectopt: &Option<String>) {
+pub fn docker_agent(epi2me: &Epi2meSetup, workflow_opt: &Option<String>, list: &bool) {
 
-    if !projectopt.is_some() {
-        println!("docker methods require a --project pointer to a workflow");
+    if !workflow_opt.is_some() {
+        println!("docker methods require a --workflow pointer to a workflow");
         return;
     }
-    let project = projectopt.as_ref().unwrap().to_string();
+    let workflow = workflow_opt.as_ref().unwrap().to_string();
 
-    println!("surveying workflow [{:?}]", project);
-    println!("data = {:?}", epi2me.epi2path);
-    println!("arch = {:?}", epi2me.arch);
-    println!("home = {:?}", epi2me.epi2wf_dir);
+    println!("surveying workflow [{:?}]", workflow);
+    // println!("data = {:?}", epi2me.epi2path);
+    // println!("arch = {:?}", epi2me.arch);
+    // println!("home = {:?}", epi2me.epi2wf_dir);
 
-    let xx = glob_path_by_wfname(epi2me, &project);
-    if xx.is_some() {
-        println!("exploring folder for config specified containers ...");
-        let mut pb = xx.unwrap().clone();
+    let mut containers: Vec<String> = Vec::new();
+    let mut valid: bool = false;
+
+    let epi2me_installed_wf = glob_path_by_wfname(epi2me, &workflow);
+    if epi2me_installed_wf.is_some() {
+        let mut pb = epi2me_installed_wf.unwrap().clone();
         pb.push("nextflow.config");
-
-        identify_containers(&pb);
+        containers = identify_containers(&pb);
+        valid = true;
     }
+
+    if !valid {
+        println!("Cannot continue - the --workflow defined cannot be resolved");
+    }
+
+    if *list {
+        for container in containers {
+            println!("{}", container);
+        }
+    }
+
 
 }

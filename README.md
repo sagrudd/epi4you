@@ -80,3 +80,18 @@ and singularity. These software containers have the challenge that they are larg
 through internet connected resources. The `docker` tools provided here are intended to simplify the identification of docker
 containers associated with individual projects. These containers can then be installed and further packaged as offline
 accessible artifacts. 
+
+### List workflow required containers
+
+It is trivial to list the container(s) required by an installed workflow revision. Please note that the example below is
+both incomplete - and versions will evolve and adapt quickly - this output was correct in Nov'23.
+
+```
+epi4you docker --workflow wf-human-variation --list
+...
+ontresearch/wf-human-variation-snp:sha0d7e7e8e8207d9d23fdf50a34ceb577da364373e
+ontresearch/snpeff:sha4f289afaf754c7a3e0b9ffb6c0b5be0f89a5cf04
+nanoporetech/dorado:sha1433bfc3146fd0dc94ad9648452364f2327cf1b0
+ontresearch/wf-cnv:sha428cb19e51370020ccf29ec2af4eead44c6a17c2
+...
+```

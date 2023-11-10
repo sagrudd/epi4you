@@ -63,7 +63,11 @@ enum Datatypes {
     Docker {
         /// define EPI2ME Desktop analysis
         #[arg(short, long)]
-        project: Option<String>,
+        workflow: Option<String>,
+
+        /// List project linked containers
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        list: bool,
     },
 
 
@@ -132,8 +136,8 @@ fn main() {
 
             match &cliargs.command {
 
-                Some(Datatypes::Docker { project }) => {
-                    docker_agent(&epi2me, project);
+                Some(Datatypes::Docker { workflow: project, list }) => {
+                    docker_agent(&epi2me, project, list);
                 },
 
                 Some(Datatypes::Database { list, runid, status, delete, rename, housekeeping, clone }) => {
