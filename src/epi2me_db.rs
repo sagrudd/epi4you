@@ -12,7 +12,7 @@ pub struct Epi2meSetup {
     pub arch: String,
 }
 
-fn get_platformstr() -> String {
+pub fn get_platformstr() -> String {
     return String::from(std::env::consts::ARCH);
 }
 

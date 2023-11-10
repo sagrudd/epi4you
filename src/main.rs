@@ -72,6 +72,10 @@ enum Datatypes {
         /// pull project linked containers
         #[arg(short, long, action=ArgAction::SetTrue)]
         pull: bool,
+
+        /// Export containers into archive
+        #[arg(short, long)]
+        export: Option<String>,
     },
 
 
@@ -141,8 +145,8 @@ async fn main() {
 
             match &cliargs.command {
 
-                Some(Datatypes::Docker { workflow: project, list, pull }) => {
-                    docker_agent(&epi2me, project, list, pull).await;
+                Some(Datatypes::Docker { workflow: project, list, pull, export }) => {
+                    docker_agent(&epi2me, project, list, pull, export).await;
                 },
 
                 Some(Datatypes::Database { list, runid, status, delete, rename, housekeeping, clone }) => {
