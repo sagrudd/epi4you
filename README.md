@@ -118,3 +118,34 @@ exporting [ontresearch/wf-human-variation-str:sha28799bc3058fa256c01c1f07c87f04e
 exporting [ontresearch/wf-human-variation-snp:sha0d7e7e8e8207d9d23fdf50a34ceb577da364373e]
 ...
 ```
+
+## Nextflow CLI mischief
+
+There is an argument for retrospectively packaging nextflow CLI runs into the GUI - especially if working with users who prefer to
+keep away from the wilds of the linux computer.
+
+### List localised nextflow analyses
+
+This is performed in a very similar way to the other functionality presented. A major difference is that `epi4you` needs to be pointed in the right
+direction - this requires the `--nxf-work` parameter that should point to a path where bulk analyses have been run.
+
+```
+epi4you nextflow --nxf-work /data/CAACB_presentation/nextflow/ --list
+
+nextflow candidate at [/usr/local/bin/nextflow]
+Using nxf_bin found at ["/usr/local/bin/nextflow"]
+Looking for nxf artifacts at [/data/CAACB_presentation/nextflow/]
+┌─────────────────────┬────────────┬───────────────────────────┬────────┬─────────────┬───────────────────────────────────┬───────────────────────────────────┐
+│ timestamp           ┆ duration   ┆ run_name                  ┆ status ┆ revision_id ┆ session_id                        ┆ command                           │
+╞═════════════════════╪════════════╪═══════════════════════════╪════════╪═════════════╪═══════════════════════════════════╪═══════════════════════════════════╡
+│ 2023-10-06 10:54:56 ┆ 2m 34s     ┆ pedantic_stonebraker      ┆ OK     ┆ 9d640fe641  ┆ 153844e1-4cdd-4239-8441-d24b5691… ┆ nextflow run epi2me-labs/wf-meta… │
+│ 2023-10-06 10:57:55 ┆ 2m 26s     ┆ big_lamarck               ┆ OK     ┆ 9d640fe641  ┆ bdbb974f-e5f7-43eb-9728-22dd42a1… ┆ nextflow run epi2me-labs/wf-meta… │
+│ 2023-10-06 11:02:01 ┆ 2m 1s      ┆ disturbed_kowalevski      ┆ OK     ┆ 9d640fe641  ┆ 45075f3a-a554-48a5-b982-05537e33… ┆ nextflow run epi2me-labs/wf-meta… │
+│ 2023-10-06 11:04:34 ┆ 1m 37s     ┆ clever_ampere             ┆ OK     ┆ 9d640fe641  ┆ e817418c-f134-4545-bc01-b91d2099… ┆ nextflow run epi2me-labs/wf-meta… │
+│ …                   ┆ …          ┆ …                         ┆ …      ┆ …           ┆ …                                 ┆ …                                 │
+│ 2023-10-06 16:04:10 ┆ 48m 42s    ┆ boring_cantor             ┆ OK     ┆ 9d640fe641  ┆ 80db0730-94f3-43df-8ff4-ebfa1fd7… ┆ nextflow run epi2me-labs/wf-meta… │
+│ 2023-10-06 16:54:35 ┆ 29m 35s    ┆ amazing_brown             ┆ OK     ┆ 9d640fe641  ┆ 7a88812e-75f2-48cb-8643-1c695f52… ┆ nextflow run epi2me-labs/wf-meta… │
+│ 2023-10-06 17:35:59 ┆ 22m 56s    ┆ lethal_booth              ┆ OK     ┆ 9d640fe641  ┆ 2424adad-ed53-480e-a008-b839afa4… ┆ nextflow run epi2me-labs/wf-meta… │
+│ 2023-10-06 20:42:29 ┆ 1h 7m 39s  ┆ berserk_sanger            ┆ OK     ┆ 9d640fe641  ┆ ec0c6f3d-acc1-4eb0-839e-5f25c7ab… ┆ nextflow run epi2me-labs/wf-meta… │
+└─────────────────────┴────────────┴───────────────────────────┴────────┴─────────────┴───────────────────────────────────┴───────────────────────────────────┘
+```
