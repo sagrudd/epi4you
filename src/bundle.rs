@@ -142,10 +142,16 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
             manifest_pb.push(MANIFEST_JSON);
             write_manifest_str(&manifest, &manifest_pb);
 
-            
+            // as per https://github.com/sagrudd/epi4you/issues/1 - ensure that destination is not in source
+            let dest = destination.unwrap();
+            let common_prefix = &dest.strip_prefix(source);
+            if !common_prefix.is_err() {
+                eprintln!("Destination is a child of source - this will not work!");
+                return;
+            }
 
             // tar up the contents specified in the manifest
-            epi2me_tar::tar(destination.unwrap(), &filecontext, &get_relative_path(&manifest_pb, &local_prefix));
+            epi2me_tar::tar(dest, &filecontext, &get_relative_path(&manifest_pb, &local_prefix));
 
     
 

@@ -1,9 +1,10 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 use app_db::dbmanager;
 use clap::{Parser, Subcommand, ArgAction};
 use docker::docker_agent;
 use manifest::load_manifest_from_tarball;
+use path_clean::PathClean;
 
 mod epi2me_db;
 mod json;
@@ -225,9 +226,20 @@ async fn main() {
                             )
                         }
 
-                        // if we are here we have a destination and a unique runid - let's package something ...
-                        let dest = Some(PathBuf::from(twome.as_ref().unwrap()));
-                        bundle::export_desktop_run(&runid_str, polardb, dest, bundle_workflow);
+                        // if we are here we have a destination and a unique runid - let's sanity check the destination PATH
+                        // there is some broken logic as described in https://github.com/sagrudd/epi4you/issues/1
+                        let path = Path::new(twome.as_ref().unwrap());
+                        let mut absolute_path;
+                        if path.is_absolute() {
+                            absolute_path = path.to_path_buf();
+                        } else {
+                            absolute_path = env::current_dir().unwrap().join(path);
+                        }
+                        absolute_path = absolute_path.clean();
+                        println!("tar .2me archive to be written to [{:?}]", absolute_path);
+
+                        // we have a destination and a unique runid - let's package something ...
+                        bundle::export_desktop_run(&runid_str, polardb, Some(absolute_path), bundle_workflow);
                     }
                 },
 
@@ -235,6 +247,8 @@ async fn main() {
                     
                     let manifest = load_manifest_from_tarball();
                     if manifest.is_some() {
+
+                        println!("importing something");
 
                     // validate that the twome file is signed and contains a manifest
 
