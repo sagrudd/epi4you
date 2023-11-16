@@ -100,7 +100,8 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
             for entry in glob(&result).expect("Failed to read glob pattern") {
                 if entry.is_ok() {
                     let e = entry.unwrap();
-                    if e.is_file() {
+                    let fname =  &e.file_name().and_then(|s| s.to_str());
+                    if e.is_file() && !fname.unwrap().contains("4u_manifest.json") { // don't yet package the manifest - it'll be added later
                         let fp = e.as_os_str().to_str().unwrap();
 
                         let mut parent = e.clone();
@@ -197,10 +198,10 @@ fn get_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
 
 
 
-pub fn _import_2me_bundle() {
+pub fn _import_2me_bundle(twome: PathBuf) {
 
     // load manifest from tarball
-    let manifest = load_manifest_from_tarball();
+    let manifest = load_manifest_from_tarball(twome);
     if manifest.is_none() {
         println!("unable to extract EPI2ME manifest from tarball");
         return;
