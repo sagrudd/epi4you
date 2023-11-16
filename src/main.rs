@@ -126,7 +126,7 @@ enum Datatypes {
     Import {
         /// filepath to the .2me file to import
         #[arg(short, long)]
-        twome_path: Option<String>,
+        twome: Option<String>,
 
         /// dryrun - validate and log import tasks without writing
         #[arg(short, long, action=ArgAction::SetTrue)]
@@ -243,7 +243,7 @@ async fn main() {
                     }
                 },
 
-                Some(Datatypes::Import { twome_path: _ , dryrun: _}) => {
+                Some(Datatypes::Import { twome: _ , dryrun: _}) => {
                     
                     let manifest = load_manifest_from_tarball();
                     if manifest.is_some() {

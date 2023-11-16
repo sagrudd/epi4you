@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, fs};
 
 use home;
 use crate::{json, workflow};
@@ -9,6 +9,7 @@ pub struct Epi2meSetup {
     pub epi2path: PathBuf,
     pub epi2db_path: PathBuf,
     pub epi2wf_dir: PathBuf,
+    pub epi4you_path: PathBuf,
     pub arch: String,
 }
 
@@ -40,6 +41,7 @@ pub fn find_db() -> Option<Epi2meSetup> {
         if path.is_some() {
             let db_path = get_appdb_path(&path.clone().unwrap());
             let wf_dir = workflow::get_epi2me_wfdir_path(&path.clone().unwrap());
+            let for_you_dir: Option<PathBuf> = get_4you_path(&path.clone().unwrap());
 
             if db_path.is_some() && wf_dir.is_some() {
 
@@ -48,6 +50,7 @@ pub fn find_db() -> Option<Epi2meSetup> {
                     epi2path: path.unwrap(),
                     epi2db_path: db_path.unwrap(),
                     epi2wf_dir: wf_dir.unwrap(),
+                    epi4you_path: for_you_dir.unwrap(),
                     arch: get_platformstr(),
                 };
 
@@ -56,6 +59,25 @@ pub fn find_db() -> Option<Epi2meSetup> {
         }
     }
 
+    return None;
+}
+
+
+fn get_4you_path(app_db_path: &PathBuf) -> Option<PathBuf> {
+    let mut x = app_db_path.clone();
+
+    x.push("import_export_4you");
+    if x.exists() {
+        println!("\t4you folder exists at [{}]", x.display());
+        return Some(x.clone());
+    } else {
+        let create = fs::create_dir(&x);
+        if create.is_ok() {
+            println!("\t4you folder created at [{}]", x.display());
+            return Some(x.clone());
+        }
+        eprintln!("\tErr - failed to create folder at [{}]", x.display());
+    }
     return None;
 }
 
