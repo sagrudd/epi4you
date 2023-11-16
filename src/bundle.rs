@@ -15,7 +15,7 @@ use std::io::{BufReader, Read};
 use crate::epi2me_db;
 use crate::json::{get_manifest_str, write_manifest_str};
 use crate::manifest::{MANIFEST_JSON, Epi2MeManifest, touch_manifest};
-use crate::{manifest::{load_manifest_from_tarball, get_manifest, Epi2MeContent, FileManifest}, app_db, epi2me_tar};
+use crate::{manifest::{get_manifest, Epi2MeContent, FileManifest}, app_db, epi2me_tar};
 
 
 fn sha256_digest(path: &str) -> String {
@@ -182,14 +182,7 @@ fn get_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
 
 
 
-pub fn _import_2me_bundle(twome: PathBuf) {
-
-    // load manifest from tarball
-    let manifest = load_manifest_from_tarball(twome);
-    if manifest.is_none() {
-        println!("unable to extract EPI2ME manifest from tarball");
-        return;
-    }
+pub fn _import_2me_bundle(_twome: PathBuf) {
 
     // check that workflow name and id are unique
 

@@ -1,7 +1,7 @@
 use std::{path::PathBuf, fs::File, io::Read};
 use tar::Archive;
 use serde::{Serialize, Deserialize};
-use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::sha256_str_digest};
+use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::sha256_str_digest, epi2me_tar::untar};
 
 pub static MANIFEST_JSON: &str = "4u_manifest.json";
 
@@ -177,7 +177,7 @@ pub fn touch_manifest(man: &mut Epi2MeManifest) {
 
 
 
-pub fn load_manifest_from_tarball(twome: PathBuf) -> Option<Epi2MeManifest> {
+pub fn load_manifest_from_tarball(twome: &PathBuf) -> Option<Epi2MeManifest> {
 
     let mut ar = Archive::new(File::open(twome).unwrap());
 
@@ -208,7 +208,7 @@ pub fn load_manifest_from_tarball(twome: PathBuf) -> Option<Epi2MeManifest> {
 }
 
 
-pub fn is_manifest_honest(manifest: &Epi2MeManifest) -> bool {
+pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> bool {
     let mut lman = manifest.clone();
     let signature = String::from(&manifest.signature);
     println!("expecting manifest checksum [{}]", signature);
@@ -216,9 +216,12 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest) -> bool {
     let resignature = sha256_str_digest(get_manifest_str(&lman).as_str());
     println!("observed manifest checksum  [{}]", resignature);
 
-    if signature == resignature {
-        return true;
+    if signature != resignature {
+        return false;
     }
+
+    // if we are here - there is parity of md5sum - let's unpack the archive and check each of the files ...
+    untar(twome);
 
     return false;
 }

@@ -252,11 +252,11 @@ async fn main() {
                         return; 
                     } else {
                         let path = PathBuf::from(twome.as_ref().unwrap());
-                        let manifest = load_manifest_from_tarball(path);
+                        let manifest = load_manifest_from_tarball(&path);
 
                         if manifest.is_some() {
 
-                            let honest = is_manifest_honest(&manifest.unwrap());
+                            let honest = is_manifest_honest(&manifest.unwrap(), &path);
                             if !honest {
                                 eprintln!("this epi4you archive is not trusted - exiting");
                                 return;
