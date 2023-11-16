@@ -37,7 +37,7 @@ fn sha256_digest(path: &str) -> String {
 }
 
 
-fn sha256_str_digest(payload_str: &str) -> String {
+pub fn sha256_str_digest(payload_str: &str) -> String {
 
     let streader = StringReader::new(payload_str);
     let mut reader = BufReader::new(streader);
@@ -134,6 +134,8 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
             manifest.filecount = u8::try_from(filecount).unwrap(); 
             manifest.files_size = files_size;  
 
+            println!("{:?}", get_manifest_str(&manifest).as_str());
+
             let manifest_signature = sha256_str_digest(get_manifest_str(&manifest).as_str());
             manifest.signature = manifest_signature;
             
@@ -163,17 +165,6 @@ fn is_nascent_manifest(manifest: &Epi2MeManifest) -> bool {
     if manifest.signature == String::from("undefined") {
         return true;
     }
-    return false;
-}
-
-
-
-fn is_file_in_manifest(e: &PathBuf, f: &Vec<FileManifest>, local_prefix: &PathBuf) -> bool {
-    println!("looking for entry == {:?}", e);
-
-    let relative_path = clip_relative_path(&e, &local_prefix);
-
-
     return false;
 }
 

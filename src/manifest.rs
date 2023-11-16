@@ -1,11 +1,12 @@
 use std::{path::PathBuf, fs::File, io::Read};
 use tar::Archive;
 use serde::{Serialize, Deserialize};
-use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::wrangle_manifest};
+use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::sha256_str_digest};
 
 pub static MANIFEST_JSON: &str = "4u_manifest.json";
 
 #[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug)]
 pub struct FileManifest {
     pub filename: String,
     pub relative_path: String,
@@ -25,6 +26,8 @@ impl Default for FileManifest {
 }
 
 #[derive(Serialize, Deserialize)]
+#[derive(Clone)]
+#[derive(Debug)]
 pub struct Epi2MEWorkflow {
     pub workflow_name: String,
     pub workflow_user: String,
@@ -50,6 +53,8 @@ impl Default for Epi2MEWorkflow {
 
 
 #[derive(Serialize, Deserialize)]
+#[derive(Clone)]
+#[derive(Debug)]
 #[allow(non_snake_case)]
 pub struct Epi2meDesktopAnalysis {
     pub id: String,
@@ -86,6 +91,8 @@ impl Default for Epi2meDesktopAnalysis {
 
 
 #[derive(Serialize, Deserialize)]
+#[derive(Clone)]
+#[derive(Debug)]
 #[serde(tag = "type")]
 pub enum Epi2MeContent {
     Epi2mePayload(Epi2meDesktopAnalysis),
@@ -94,6 +101,8 @@ pub enum Epi2MeContent {
 
 
 #[derive(Serialize, Deserialize)]
+#[derive(Clone)]
+#[derive(Debug)]
 pub struct Epi2MeManifest {
     pub id: String,
     pub src_path: String,
@@ -180,7 +189,7 @@ pub fn load_manifest_from_tarball(twome: PathBuf) -> Option<Epi2MeManifest> {
             let ufilepath = file_path.unwrap().into_owned();
             println!("\t\tobserving file {:?}", &ufilepath);
             let fname =  &ufilepath.file_name().and_then(|s| s.to_str());
-            if fname.is_some() && fname.unwrap().contains("4u_manifest.json") {
+            if fname.is_some() && fname.unwrap().contains(MANIFEST_JSON) {
                 println!("this is the manifest ...");
 
                 let mut buffer = String::new();
@@ -196,4 +205,20 @@ pub fn load_manifest_from_tarball(twome: PathBuf) -> Option<Epi2MeManifest> {
     }
 
     return None;
+}
+
+
+pub fn is_manifest_honest(manifest: &Epi2MeManifest) -> bool {
+    let mut lman = manifest.clone();
+    let signature = String::from(&manifest.signature);
+    println!("expecting manifest checksum [{}]", signature);
+    lman.signature = String::from("undefined");
+    let resignature = sha256_str_digest(get_manifest_str(&lman).as_str());
+    println!("observed manifest checksum  [{}]", resignature);
+
+    if signature == resignature {
+        return true;
+    }
+
+    return false;
 }

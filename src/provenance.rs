@@ -4,6 +4,8 @@ use serde::{Serialize, Deserialize};
 
 
 #[derive(Serialize, Deserialize)]
+#[derive(Clone)]
+#[derive(Debug)]
 pub struct Epi2MeProvenance {
     pub id: String,
     pub action: String,
