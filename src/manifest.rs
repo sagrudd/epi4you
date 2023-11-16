@@ -1,4 +1,5 @@
-use std::{path::PathBuf, fs::File};
+use std::{path::PathBuf, fs::File, io::Read};
+use tar::Archive;
 use serde::{Serialize, Deserialize};
 use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::wrangle_manifest};
 
@@ -165,7 +166,34 @@ pub fn touch_manifest(man: &mut Epi2MeManifest) {
 
 
 
-pub fn load_manifest_from_tarball() -> Option<Epi2MeManifest> {
+
+
+pub fn load_manifest_from_tarball(twome: PathBuf) -> Option<Epi2MeManifest> {
+
+    let mut ar = Archive::new(File::open(twome).unwrap());
+
+    for (_i, file) in ar.entries().unwrap().enumerate() {
+        let mut file = file.unwrap();
+        
+        let file_path = file.path();
+        if file_path.is_ok() {
+            let ufilepath = file_path.unwrap().into_owned();
+            println!("\t\tobserving file {:?}", &ufilepath);
+            let fname =  &ufilepath.file_name().and_then(|s| s.to_str());
+            if fname.is_some() && fname.unwrap().contains("4u_manifest.json") {
+                println!("this is the manifest ...");
+
+                let mut buffer = String::new();
+
+                let manifest = file.read_to_string(&mut buffer);
+                if manifest.is_ok() {
+                    // println!("{buffer}");
+                    let epi2me_manifest: Epi2MeManifest = serde_json::from_str(&buffer).expect("error while reading json");
+                    return Some(epi2me_manifest);
+                }
+            }
+        }
+    }
 
     return None;
 }

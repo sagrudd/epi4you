@@ -243,12 +243,24 @@ async fn main() {
                     }
                 },
 
-                Some(Datatypes::Import { twome: _ , dryrun: _}) => {
-                    
-                    let manifest = load_manifest_from_tarball();
-                    if manifest.is_some() {
+                Some(Datatypes::Import { twome, dryrun: _}) => {
 
-                        println!("importing something");
+                    if twome.is_none() {
+                        eprintln!("EPI2ME twome import requires a --twome <file> target to read");
+                        return; 
+                    } else {
+                        let path = PathBuf::from(twome.as_ref().unwrap());
+                        let manifest = load_manifest_from_tarball(path);
+
+                        if manifest.is_some() {
+
+                            println!("importing something");
+
+                        }
+                    }
+
+                    
+
 
                     // validate that the twome file is signed and contains a manifest
 
@@ -273,7 +285,7 @@ async fn main() {
                     // cleanup any residual temp folder content
 
 
-                    }
+                    
 
                 },
 
