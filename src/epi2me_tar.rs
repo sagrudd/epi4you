@@ -29,7 +29,7 @@ pub fn tar(tarfile: PathBuf, files: &Vec<FileManifest>, manifest: &PathBuf) {
 }
 
 
-pub fn untar(tarfile: &PathBuf) {
+pub fn untar(tarfile: &PathBuf) -> Option<PathBuf> {
     let local_prefix = epi2me_db::find_db().unwrap().epi4you_path;
     println!("untar of file [{:?}] into [{:?}]", tarfile, local_prefix);
     let _ = env::set_current_dir(&local_prefix);
@@ -43,8 +43,11 @@ pub fn untar(tarfile: &PathBuf) {
             let unp = file.unpack_in(&local_prefix);
             if unp.is_err() {
                 eprintln!(" error {:?}", unp.err());
+                return None;
             }
-            
         }
+        return Some(local_prefix.clone());
     }
+
+    return None;
 }

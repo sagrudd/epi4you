@@ -1,7 +1,7 @@
 use std::{path::PathBuf, fs::File, io::Read};
 use tar::Archive;
 use serde::{Serialize, Deserialize};
-use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::sha256_str_digest, epi2me_tar::untar};
+use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::{sha256_str_digest, sha256_digest}, epi2me_tar::untar};
 
 pub static MANIFEST_JSON: &str = "4u_manifest.json";
 
@@ -221,7 +221,40 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> bool {
     }
 
     // if we are here - there is parity of md5sum - let's unpack the archive and check each of the files ...
-    untar(twome);
+    let untar_status = untar(twome);
+    if untar_status.is_some() {
+        println!("tarfile successfully unpacked - sanity checking the packed files ...");
+
+        for cfile in &manifest.payload {
+            let is_desktop_payload = matches!(cfile, Epi2MeContent::Epi2mePayload { .. });
+            let is_epi2me_workflow = matches!(cfile, Epi2MeContent::Epi2MEWorkflow { .. });
+            println!("Epi2mePayload :: {:?}", is_desktop_payload);
+            println!("Epi2meWorkflow :: {:?}", is_epi2me_workflow);
+
+            match cfile {
+                Epi2MeContent::Epi2MEWorkflow { .. } => println!("Epi2MEWorkflow"),
+                Epi2MeContent::Epi2mePayload(desktop_analysis) => {
+                    println!("Epi2MEWorkflow");
+                    for file in &desktop_analysis.files {
+                        println!("file [{:?}]", file);
+                        let file_to_check = PathBuf::from(&file.relative_path).join(PathBuf::from(&file.filename));
+                        if !file_to_check.exists() {
+                            eprintln!("error - file [{:?}] is missing", file_to_check);
+                            return false;
+                        }
+                        let digest = sha256_digest(&file_to_check.to_str().unwrap());
+                        if !(&digest == &file.md5sum) {
+                            eprintln!(" error checksum inconsistency - {digest}");
+                            return false;
+                        }
+                    }
+                },
+                
+            }
+
+        }
+
+    }
 
     return false;
 }

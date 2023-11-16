@@ -18,7 +18,7 @@ use crate::manifest::{MANIFEST_JSON, Epi2MeManifest, touch_manifest};
 use crate::{manifest::{get_manifest, Epi2MeContent, FileManifest}, app_db, epi2me_tar};
 
 
-fn sha256_digest(path: &str) -> String {
+pub fn sha256_digest(path: &str) -> String {
 
     let input = File::open(path).unwrap();
     let mut reader = BufReader::new(input);
