@@ -1,6 +1,34 @@
 # epi4you
 Some data wrangling for the EPI2ME desktop environment
 
+## Headline features
+
+The ambition for this application was a toolkit to faciliate the export and import of analyses
+that have been run using the EPI2ME desktop application. Why would anyone care about this functionality?
+This could be useful to share runs between computers, between users, or to populate a demonstration
+computer with exciting and colourful datasets. This section on the `headline` features includes the core
+functionality.
+
+### Backup an EPI2ME Desktop run to a .2me format archive
+
+First step - have a look and see which analysis runs are available on your computer. 
+
+```
+epi4you epi2me --list # can be used to identify the analyses that have been run
+```
+
+Pick the `id` from the run that you would like to archive; then pack the dataset into a `.2me` file.
+
+```
+epi4you epi2me --runid 01HBWYY322RMWACRMGX70BMMPB --twome /tmp/wf-clone-validation.2me.tar
+```
+
+### Import an EPI2ME Desktop run from a .2me format archive
+
+```
+epi4you import --twome /tmp/wf-clone-validation.2me.tar
+```
+
 ## Simple manipulation of the EPI2ME Desktop Application's database entries
 
 ### List workflow instances
