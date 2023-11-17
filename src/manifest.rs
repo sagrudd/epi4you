@@ -1,7 +1,7 @@
 use std::{path::PathBuf, fs::File, io::Read};
 use tar::Archive;
 use serde::{Serialize, Deserialize};
-use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::{sha256_str_digest, sha256_digest}, epi2me_tar::untar};
+use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::{sha256_str_digest, sha256_digest}, epi2me_tar::untar, app_db::insert_untarred_desktop_analysis};
 
 pub static MANIFEST_JSON: &str = "4u_manifest.json";
 
@@ -208,7 +208,10 @@ pub fn load_manifest_from_tarball(twome: &PathBuf) -> Option<Epi2MeManifest> {
 }
 
 
-pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> bool {
+pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> Option<Vec<Epi2MeContent>> {
+
+    let mut successful_content: Vec<Epi2MeContent> = Vec::new();
+
     let mut lman = manifest.clone();
     let signature = String::from(&manifest.signature);
     println!("expecting manifest checksum [{}]", signature);
@@ -217,7 +220,7 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> bool {
     println!("observed manifest checksum  [{}]", resignature);
 
     if signature != resignature {
-        return false;
+        return None;
     }
 
     // if we are here - there is parity of md5sum - let's unpack the archive and check each of the files ...
@@ -233,6 +236,7 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> bool {
 
             match cfile {
                 Epi2MeContent::Epi2MEWorkflow { .. } => println!("Epi2MEWorkflow"),
+                
                 Epi2MeContent::Epi2mePayload(desktop_analysis) => {
                     println!("Epi2MEWorkflow");
                     for file in &desktop_analysis.files {
@@ -240,21 +244,36 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> bool {
                         let file_to_check = PathBuf::from(&file.relative_path).join(PathBuf::from(&file.filename));
                         if !file_to_check.exists() {
                             eprintln!("error - file [{:?}] is missing", file_to_check);
-                            return false;
+                            return None;
                         }
                         let digest = sha256_digest(&file_to_check.to_str().unwrap());
                         if !(&digest == &file.md5sum) {
                             eprintln!(" error checksum inconsistency - {digest}");
-                            return false;
+                            return None;
                         }
                     }
+                    // if we are here then the manifest specified files are present and coherent; we're good to go ...
+                    successful_content.push(cfile.clone());
                 },
                 
             }
-
         }
-
+        return Some(successful_content);
     }
+    return None;
+}
 
-    return false;
+
+pub fn import_resolved_content(content: &Vec<Epi2MeContent>) {
+    for cfile in content {
+
+        match cfile {
+            Epi2MeContent::Epi2MEWorkflow { .. } => println!("Epi2MEWorkflow"),
+            
+            Epi2MeContent::Epi2mePayload(desktop_analysis) => {
+                println!("importing DesktopAnalysis[{}]", &desktop_analysis.id);
+                insert_untarred_desktop_analysis(desktop_analysis);
+            }
+        }
+    }
 }

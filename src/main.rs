@@ -19,7 +19,7 @@ mod docker;
 
 use std::env;
 
-use crate::manifest::is_manifest_honest;
+use crate::manifest::{is_manifest_honest, import_resolved_content};
 
 /// Trivial application to package EPI2ME workflows and analysis results
 #[derive(Parser)]
@@ -257,12 +257,15 @@ async fn main() {
                         if manifest.is_some() {
 
                             let honest = is_manifest_honest(&manifest.unwrap(), &path);
-                            if !honest {
+                            if honest.is_none() {
                                 eprintln!("this epi4you archive is not trusted - exiting");
                                 return;
+                            } if honest.is_some() {
+                                println!("importing something");
+                                import_resolved_content(&honest.unwrap());
                             }
 
-                            println!("importing something");
+                            
 
                         } else {
                             eprintln!("This archive may be malformed - cannot continue");

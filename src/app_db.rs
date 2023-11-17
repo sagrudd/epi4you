@@ -6,7 +6,7 @@ use ulid::Ulid;
 use std::{env, fs};
 use std::path::PathBuf;
 use crate::manifest::Epi2meDesktopAnalysis;
-use crate::workflow;
+use crate::{workflow, epi2me_db};
 
 
 #[allow(dead_code)]
@@ -159,6 +159,23 @@ fn get_instance_struct(runid: &String, polardb: &DataFrame) -> Option<Epi2MeAnal
     }
     return None;
 }
+
+fn get_instance_struct_from_desktop_analysis(danalysis: &Epi2meDesktopAnalysis) -> Option<Epi2MeAnalysis> {
+    
+    let x = Epi2MeAnalysis { 
+        id: String::from(&danalysis.id),
+        path: String::from(&danalysis.path),
+        name: String::from(&danalysis.name),
+        status: String::from(&danalysis.status),
+        workflowRepo: String::from(&danalysis.workflowRepo),
+        workflowUser: String::from(&danalysis.workflowUser),
+        workflowCommit: String::from(&danalysis.workflowCommit),
+        workflowVersion: String::from(&danalysis.workflowVersion),
+        createdAt: String::from(&danalysis.createdAt),
+        updatedAt: String::from(&danalysis.updatedAt),
+    };
+    return Some(x);
+} 
 
 
 pub fn get_analysis_struct(runid: &String, polardb: &DataFrame) -> Option<Epi2meDesktopAnalysis> {
@@ -405,52 +422,115 @@ pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runi
         if !validate_db_entry(&runid_str, epi2me_instances) {
             return;
         }
-        
-        let epi2meitem = get_instance_struct(runid_str, epi2me_instances);
-        if epi2meitem.is_some() {
-            let mut epi2meitem_x: Epi2MeAnalysis = epi2meitem.unwrap();
-            epi2meitem_x.id = Ulid::new().to_string();
-            epi2meitem_x.name = clone.as_ref().unwrap().to_string();
-
-            // create a new path for the analysis
-            let src_dir = epi2meitem_x.path.clone();
-            let mut dst_dir = PathBuf::from(epi2meitem_x.path.clone());
-            dst_dir.pop();
-            dst_dir.push(vec![epi2meitem_x.workflowRepo.clone(), epi2meitem_x.id.clone()].join("_"));
-            let dest_str = dst_dir.into_os_string().into_string().unwrap();
-            epi2meitem_x.path = dest_str.clone();
-
-            // we can (or should) also update the timestamps since this is a retouch ...
-            // e.g. 2023-11-09 07:20:43.492 +00:00
-            let local: DateTime<Local> = Local::now();
-            println!("NOW == {:?}", local);
-            epi2meitem_x.createdAt = local.to_string();
-            epi2meitem_x.updatedAt = local.to_string();
-
-            println!("new epi2meobj = {:?}", &epi2meitem_x);
-            insert_into_db(&path, &epi2meitem_x);
-            // and copy across the accompanying files ...
-            let mut from_paths: Vec<String> = Vec::new();
-            let paths = fs::read_dir(src_dir).unwrap();
-            for path in paths {
-                let xpath = path.unwrap().path().clone();
-                let zz = xpath.into_os_string().into_string().unwrap();
-                from_paths.push(zz);
-            }
-            let dest = dest_str.clone();
-            let mkdir = fs::create_dir(&dest);
-            println!("dest = {:?} = {:?}", dest, mkdir);
-            let opts = dir::CopyOptions::new();
-            let cp = copy_items(&from_paths, &dest, &opts);
-            println!("state = {:?}", cp);
-
-            resync_progress_json(&dest, runid_str, &epi2meitem_x.id.clone());
-            
-        }
+        clone_extant_database_entry(runid_str, epi2me_instances, clone, path);
     }
 
 }
 
+
+
+fn epi2me_item_rebrand(epi2meitem: &Epi2MeAnalysis, clone: &Option<String>) -> Epi2MeAnalysis {
+    let mut epi2meitem_x: Epi2MeAnalysis = epi2meitem.clone();
+    epi2meitem_x.id = Ulid::new().to_string();
+    if clone.is_some() {
+        epi2meitem_x.name = clone.as_ref().unwrap().to_string();
+    }
+    // create a new path for the analysis
+    let mut dst_dir = epi2me_db::find_db().unwrap().instances_path;
+    dst_dir.push(vec![epi2meitem_x.workflowRepo.clone(), epi2meitem_x.id.clone()].join("_"));
+    let dest_str = dst_dir.into_os_string().into_string().unwrap();
+    epi2meitem_x.path = dest_str.clone();
+
+    // we can (or should) also update the timestamps since this is a retouch ...
+    // e.g. 2023-11-09 07:20:43.492 +00:00
+    let local: DateTime<Local> = Local::now();
+    println!("NOW == {:?}", local);
+    // epi2meitem_x.createdAt = local.to_string();
+    epi2meitem_x.updatedAt = local.to_string();
+
+    return epi2meitem_x;
+}
+
+fn clone_extant_database_entry(runid_str: &String, epi2me_instances: &DataFrame, clone: &Option<String>, path: &PathBuf) {
+    let epi2meitem = get_instance_struct(runid_str, epi2me_instances);
+    if epi2meitem.is_some() {
+        let e2eitem = epi2meitem.unwrap();
+        let mut src_dir = epi2me_db::find_db().unwrap().instances_path;
+        src_dir.push(vec![String::from(&e2eitem.workflowRepo) ,String::from(&e2eitem.id)].join("_"));
+
+        let epi2meitem_x = epi2me_item_rebrand(&e2eitem, clone);
+        println!("new epi2meobj = {:?}", &epi2meitem_x);
+
+        insert_into_db(&path, &epi2meitem_x);
+        
+        // and copy across the accompanying files ...
+        println!("copying files from source path [{:?}]", src_dir);
+        let mut from_paths: Vec<String> = Vec::new();
+        let paths = fs::read_dir(src_dir).unwrap();
+        for path in paths {
+            let xpath = path.unwrap().path().clone();
+            let zz = xpath.into_os_string().into_string().unwrap();
+            println!("munging file [{:?}]", zz);
+            from_paths.push(zz);
+        }
+        let dest = epi2meitem_x.path.clone();
+        let mkdir = fs::create_dir(&dest);
+        println!("dest = {:?} = {:?}", dest, mkdir);
+        let opts = dir::CopyOptions::new();
+        let cp = copy_items(&from_paths, &dest, &opts);
+        println!("state = {:?}", cp);
+
+        resync_progress_json(&dest, runid_str, &epi2meitem_x.id.clone());
+        
+    }
+}
+
+
+pub fn insert_untarred_desktop_analysis(desktop_analysis: &Epi2meDesktopAnalysis) {
+
+    let epi2meitem = get_instance_struct_from_desktop_analysis(desktop_analysis);
+    if epi2meitem.is_some() {
+        let e2eitem = epi2meitem.unwrap();
+        let src_dir = epi2me_db::find_db().unwrap().epi4you_path;
+        // src_dir.push("instances");
+        // src_dir.push(vec![String::from(&e2eitem.workflowRepo) ,String::from(&e2eitem.id)].join("_"));
+
+        let clone: Option<String> = None; // keep the name already used
+        let epi2meitem_x = epi2me_item_rebrand(&e2eitem, &clone);
+        println!("new epi2meobj = {:?}", &epi2meitem_x);
+        
+        insert_into_db(&epi2me_db::find_db().unwrap().epi2db_path, &epi2meitem_x);
+
+        // and copy across the accompanying files ...
+        for file in &desktop_analysis.files {
+            let file_to_check = PathBuf::from(&src_dir).join(&file.relative_path).join(PathBuf::from(&file.filename));
+            
+            let mut rp = PathBuf::from(&file.relative_path);
+            if rp.starts_with("instances") {
+                rp = PathBuf::from(rp.strip_prefix("instances").unwrap());
+                let exp_dir = vec![String::from(&e2eitem.workflowRepo) ,String::from(&e2eitem.id)].join("_");
+                if rp.starts_with(&exp_dir) {
+                    rp = PathBuf::from(rp.strip_prefix(exp_dir).unwrap());
+                }
+            }
+
+            let dest_file = PathBuf::from(&epi2meitem_x.path).join(&rp).join(PathBuf::from(&file.filename));
+
+            // ensure that directories have been created 
+            if dest_file.parent().is_some() && !dest_file.parent().unwrap().exists() {
+                let _ = fs::create_dir_all(dest_file.parent().unwrap());
+            }
+            println!("copying file [{:?}]", file_to_check);
+            let _ = fs::copy(file_to_check, dest_file);
+        }
+
+        // and manually add the manifest file ....
+
+
+
+        resync_progress_json(&epi2meitem_x.path, &e2eitem.id, &epi2meitem_x.id.clone());
+    }
+}
 
 
 macro_rules! struct_to_dataframe {

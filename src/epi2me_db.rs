@@ -10,6 +10,7 @@ pub struct Epi2meSetup {
     pub epi2db_path: PathBuf,
     pub epi2wf_dir: PathBuf,
     pub epi4you_path: PathBuf,
+    pub instances_path: PathBuf,
     pub arch: String,
 }
 
@@ -40,6 +41,8 @@ pub fn find_db() -> Option<Epi2meSetup> {
 
         if path.is_some() {
             let db_path = get_appdb_path(&path.clone().unwrap());
+            let mut instances_path = PathBuf::from(&path.clone().unwrap());
+            instances_path.push("instances");
             let wf_dir = workflow::get_epi2me_wfdir_path(&path.clone().unwrap());
             let for_you_dir: Option<PathBuf> = get_4you_path(&path.clone().unwrap());
 
@@ -48,9 +51,10 @@ pub fn find_db() -> Option<Epi2meSetup> {
                 let vehicle = Epi2meSetup {
                     epi2os: os.unwrap(),
                     epi2path: path.unwrap(),
-                    epi2db_path: db_path.unwrap(),
+                    epi2db_path: PathBuf::from(&db_path.unwrap()),
                     epi2wf_dir: wf_dir.unwrap(),
                     epi4you_path: for_you_dir.unwrap(),
+                    instances_path: instances_path,
                     arch: get_platformstr(),
                 };
 
