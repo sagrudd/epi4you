@@ -7,6 +7,7 @@ use ulid::Ulid;
 use std::{env, fs};
 use std::path::PathBuf;
 use crate::dataframe::analysis_vec_to_df;
+use crate::dataframe::filter_df_by_value;
 use crate::manifest::Epi2meDesktopAnalysis;
 use crate::{workflow, epi2me_db};
 
@@ -64,13 +65,6 @@ pub fn load_db(path: &PathBuf) -> Result<DataFrame, rusqlite::Error> {
 }
 
 
-fn filter_df_by_value(df: &DataFrame, column: &String, value: &String) -> Result<DataFrame, PolarsError> {
-
-    return df.clone()
-    .lazy()
-    .filter(col(column).is_in(lit(Series::from_iter(vec![String::from(value)])))).collect();
-
-}
 
 fn get_db_id_entry(runid: &String, polardb: &DataFrame) -> Result<DataFrame, PolarsError> {
     // is runid in name field and unique

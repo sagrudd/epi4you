@@ -73,6 +73,10 @@ enum Datatypes {
         #[arg(short, long, action=ArgAction::SetTrue)]
         list: bool,
 
+        /// specify a workflow
+        #[arg(short, long)]
+        workflow: Option<String>,
+
     },
 
     /// containers used by the EPI2ME software
@@ -169,8 +173,8 @@ async fn main() {
                     dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename, housekeeping, clone);
                 },
 
-                Some(Datatypes::Workflow { list }) => {
-                    workflow_manager(list);
+                Some(Datatypes::Workflow { list, workflow }) => {
+                    workflow_manager(list, workflow);
                 },
 
                 Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid }) => {
