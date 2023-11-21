@@ -62,7 +62,14 @@ pub fn glob_path_by_wfname(epi2me: &Epi2meSetup, project: &String) -> Option<Pat
         }
     }
     // we can also assess whether project is a link to e.g. a nextflow based folder elsewhere on CLI
-
-
     return None;
+}
+
+
+pub fn workflow_manager(list: &bool) {
+    
+    if *list {
+        println!("Listing installed bioinformatics workflows");
+    }
+
 }

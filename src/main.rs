@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand, ArgAction};
 use docker::docker_agent;
 use manifest::load_manifest_from_tarball;
 use path_clean::PathClean;
+use workflow::workflow_manager;
 
 mod epi2me_db;
 mod json;
@@ -33,6 +34,7 @@ struct Args {
 #[derive(Subcommand)]
 enum Datatypes {
 
+    /// the EPI2ME Desktop applications database of analysis runs
     Database {
         /// List database entries
         #[arg(short, long, action=ArgAction::SetTrue)]
@@ -63,6 +65,15 @@ enum Datatypes {
         clone: Option<String>,
     },
 
+    /// the core nextflow workflows used by the application
+    Workflow {
+        /// List project linked containers
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        list: bool,
+
+    },
+
+    /// containers used by the EPI2ME software
     Docker {
         /// define EPI2ME Desktop analysis
         #[arg(short, long)]
@@ -154,6 +165,10 @@ async fn main() {
 
                 Some(Datatypes::Database { list, runid, status, delete, rename, housekeeping, clone }) => {
                     dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename, housekeeping, clone);
+                },
+
+                Some(Datatypes::Workflow { list }) => {
+                    workflow_manager(list);
                 },
 
                 Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid }) => {
