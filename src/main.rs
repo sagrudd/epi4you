@@ -74,8 +74,8 @@ enum Datatypes {
         list: bool,
 
         /// specify a workflow
-        #[arg(short, long)]
-        workflow: Option<String>,
+        #[arg(num_args(0..), short, long)]
+        workflow: Vec<String>,
 
     },
 

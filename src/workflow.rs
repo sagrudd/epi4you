@@ -131,47 +131,49 @@ fn workflows_to_polars(path: &PathBuf) -> Option<DataFrame> {
 }
 
 
-pub fn workflow_manager(list: &bool, workflow: &Option<String>) {
+pub fn workflow_manager(list: &bool, workflow: &Vec<String>) {
     
     let src_dir = epi2me_db::find_db().unwrap().epi2wf_dir;
     let df = workflows_to_polars(&src_dir);
+    let df2 = df.as_ref().unwrap();
 
     if *list {
         println!("Listing installed bioinformatics workflows from [{:?}]", &src_dir);
-        if df.is_some() {
+        if df.as_ref().is_some() {
             print_polars_df(&df.unwrap());
         }
         return;
     }
-    if !workflow.is_some() {
+    if workflow.len() == 0 {
         eprintln!("The workflow option requires a `--workflow` parameter to specify workflow of interest");
         return;
     }
-    let wf = workflow.clone().unwrap();
-    println!("processing workflow [{}]", &wf);
-    
-    // checking if project / name exist in the df
-    let split = &wf.split_once("/");
-    if split.is_none() {
-        eprintln!("workflow [{:?}] could not be split - requires a '/' delimiter", &wf);
-        return;
+
+    for workflow_id in workflow {
+        println!("processing workflow [{}]", &workflow_id);
+        
+        // checking if project / name exist in the df
+        let split = &workflow_id.split_once("/");
+        if split.is_none() {
+            eprintln!("workflow [{:?}] could not be split - requires a '/' delimiter", &workflow_id);
+            return;
+        }
+        let (project, name) = split.unwrap();
+        // filter on project and name
+        let filtered_df = two_field_filter(&df2, &String::from("project"), &String::from(project), &String::from("name"), &String::from(name)); 
+        if filtered_df.is_none() {
+            eprintln!("unexpected failure - failed to find appropriate workflow installation");
+        }
+        let filtered = filtered_df.unwrap();
+        let height = filtered.height();
+        if height == 0 {
+            eprintln!("failed to resolve specified workflow installation [{}]", &workflow_id);
+            return;
+        } else if height > 1 { // can this even happen?
+            eprintln!("specified workflow installation is ambiguous [{}]", &workflow_id);
+            return;
+        }
+        print_polars_df(&filtered);
     }
-    let (project, name) = split.unwrap();
-    // filter on project and name
-    let filtered_df = two_field_filter(&df.unwrap(), &String::from("project"), &String::from(project), &String::from("name"), &String::from(name)); 
-    if filtered_df.is_none() {
-        eprintln!("unexpected failure - failed to find appropriate workflow installation");
-    }
-    let filtered = filtered_df.unwrap();
-    let height = filtered.height();
-    if height == 0 {
-        eprintln!("failed to resolve specified workflow installation [{}]", &wf);
-        return;
-    } else if height > 1 { // can this even happen?
-        eprintln!("specified workflow installation is ambiguous [{}]", &wf);
-        return;
-    }
-    print_polars_df(&filtered);
-    
 
 }
