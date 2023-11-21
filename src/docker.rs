@@ -33,7 +33,11 @@ fn string_clip(src: String) -> String {
     return String::from(&src[start..end]);
 }
 
-fn nextflow_parser(contents: &String) -> HashMap<String, String> {
+pub fn nextflow_parser(xcontents: &String) -> HashMap<String, String> {
+    let mut contents = String::from(xcontents);
+
+    contents = contents.replace(" { ", " {\n");
+    contents = contents.replace("}\n", " \n}\n");
 
     let mut key: Vec<String> = Vec::new();
     let mut cache: Vec<String> = Vec::new();
@@ -118,10 +122,8 @@ fn extract_containers(config: &HashMap<String, String>) -> Vec<String> {
 
 
 fn identify_containers(pb: &PathBuf) -> (HashMap<String, String>, Vec<String>) {
-    let mut contents = fs::read_to_string(&pb).unwrap();
-    contents = contents.replace(" { ", " {\n");
-    contents = contents.replace("}\n", " \n}\n");
-    // println!("{}", &contents);
+    let contents = fs::read_to_string(&pb).unwrap();
+
     let config = nextflow_parser(&contents);
     return (config.clone(), extract_containers(&config.clone()));
 }

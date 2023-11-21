@@ -2,9 +2,11 @@ use chrono::{Local, DateTime};
 use fs_extra::{copy_items, dir};
 use rusqlite::{Connection, Result};
 use polars::prelude::*;
+use polars::df;
 use ulid::Ulid;
 use std::{env, fs};
 use std::path::PathBuf;
+use crate::dataframe::analysis_vec_to_df;
 use crate::manifest::Epi2meDesktopAnalysis;
 use crate::{workflow, epi2me_db};
 
@@ -12,17 +14,17 @@ use crate::{workflow, epi2me_db};
 #[allow(dead_code)]
 #[allow(non_snake_case)]
 #[derive(Clone, Debug)]
-struct Epi2MeAnalysis {
-    id: String,
-    path: String,
-    name: String,
-    status: String,
-    workflowRepo: String,
-    workflowUser: String,
-    workflowCommit: String,
-    workflowVersion: String,
-    createdAt: String,
-    updatedAt: String,
+pub struct Epi2MeAnalysis {
+    pub id: String,
+    pub path: String,
+    pub name: String,
+    pub status: String,
+    pub workflowRepo: String,
+    pub workflowUser: String,
+    pub workflowCommit: String,
+    pub workflowVersion: String,
+    pub createdAt: String,
+    pub updatedAt: String,
 }
 
 #[allow(non_snake_case)]
@@ -57,14 +59,7 @@ pub fn load_db(path: &PathBuf) -> Result<DataFrame, rusqlite::Error> {
     }
 
     // and wrangle observations into a dataframe
-    let df: DataFrame = struct_to_dataframe!(nf_run_vec, [id,
-        path,
-        name,
-        status,
-        workflowRepo,
-        workflowUser,
-        workflowCommit, workflowVersion, createdAt, updatedAt]).unwrap();
-
+    let df = analysis_vec_to_df(nf_run_vec);
     Ok(df)
 }
 
@@ -531,22 +526,4 @@ pub fn insert_untarred_desktop_analysis(desktop_analysis: &Epi2meDesktopAnalysis
         resync_progress_json(&epi2meitem_x.path, &e2eitem.id, &epi2meitem_x.id.clone());
     }
 }
-
-
-macro_rules! struct_to_dataframe {
-    ($input:expr, [$($field:ident),+]) => {
-        {
-            // Extract the field values into separate vectors
-            $(let mut $field = Vec::new();)*
-
-            for e in $input.into_iter() {
-                $($field.push(e.$field);)*
-            }
-            df! {
-                $(stringify!($field) => $field,)*
-            }
-        }
-    };
-}
-pub(crate) use struct_to_dataframe;
 

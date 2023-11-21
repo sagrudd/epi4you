@@ -1,8 +1,9 @@
 use std::process::Command;
 use polars_core::prelude::*;
 use std::io::Cursor;
-use std::env;
 use std::path::PathBuf;
+
+use crate::dataframe::nextflow_vec_to_df;
 
 
 
@@ -65,14 +66,14 @@ struct Row<'a> {
 }
 
 #[derive(Debug)]
-struct NxfLogItem {
-    timestamp: String,
-    duration: String,
-    run_name: String,
-    status: String,
-    revision_id: String,
-    session_id: String,
-    command: String,
+pub struct NxfLogItem {
+    pub timestamp: String,
+    pub duration: String,
+    pub run_name: String,
+    pub status: String,
+    pub revision_id: String,
+    pub session_id: String,
+    pub command: String,
 }
 
 impl Default for NxfLogItem {
@@ -142,13 +143,7 @@ pub fn parse_nextflow_folder(nxf_workdir: Option<String>, nxf_bin: Option<String
         }
 
             // and wrangle observations into a dataframe
-            let df: DataFrame = struct_to_dataframe!(vec, [timestamp,
-                duration,
-                run_name,
-                status,
-                revision_id,
-                session_id,
-                command]).unwrap();
+            let df = nextflow_vec_to_df(vec);
 
             //print_nxf_log(&df);
             return Some(df);
@@ -176,40 +171,3 @@ pub fn validate_db_entry(_runid: String, polardb: &DataFrame) -> bool {
     return false;
 }
 
-
-pub fn print_nxf_log(df: &DataFrame) {
-    env::set_var("POLARS_FMT_TABLE_HIDE_DATAFRAME_SHAPE_INFORMATION", "1");
-    env::set_var("POLARS_FMT_TABLE_HIDE_COLUMN_DATA_TYPES","1");
-    /* 
-    let df2 = df!(
-        "id" => df.column("id").unwrap(),
-        "name" => df.column("name").unwrap(),
-        "workflowRepo" => df.column("workflowRepo").unwrap(),
-        "createdAt" => df.column("createdAt").unwrap(),
-    );
-
-    if df2.is_ok() {
-        println!("{:?}", df2.unwrap());
-    }
-    */
-
-    println!("{:?}", df);
-}
-
-
-macro_rules! struct_to_dataframe {
-    ($input:expr, [$($field:ident),+]) => {
-        {
-            // Extract the field values into separate vectors
-            $(let mut $field = Vec::new();)*
-
-            for e in $input.into_iter() {
-                $($field.push(e.$field);)*
-            }
-            df! {
-                $(stringify!($field) => $field,)*
-            }
-        }
-    };
-}
-pub(crate) use struct_to_dataframe;

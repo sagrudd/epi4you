@@ -2,6 +2,7 @@ use std::path::{PathBuf, Path};
 
 use app_db::dbmanager;
 use clap::{Parser, Subcommand, ArgAction};
+use dataframe::print_polars_df;
 use docker::docker_agent;
 use manifest::load_manifest_from_tarball;
 use path_clean::PathClean;
@@ -17,6 +18,7 @@ mod provenance;
 mod workflow;
 mod epi2me_tar;
 mod docker;
+mod dataframe;
 
 use std::env;
 
@@ -186,7 +188,7 @@ async fn main() {
                     }
 
                     if *list {
-                        nextflow::print_nxf_log(&localruns.unwrap());
+                        print_polars_df(&localruns.unwrap());
                         // todo - how do we print out dataframe with a more considered number of columns?
                     } else {
                         if runid.is_none() {

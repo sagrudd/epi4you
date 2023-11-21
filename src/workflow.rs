@@ -1,6 +1,19 @@
 use std::{path::PathBuf, fs};
 use glob::glob;
-use crate::epi2me_db::Epi2meSetup;
+use polars_core::prelude::DataFrame;
+use serde::{Serialize, Deserialize};
+use crate::{epi2me_db::{Epi2meSetup, self}, docker::nextflow_parser, dataframe::{workflow_vec_to_df, print_polars_df}};
+
+
+#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug)]
+pub struct Workflow {
+    pub project: String,
+    pub name: String,
+    pub version: String,
+}
+
+
 
 
 pub fn get_epi2me_wfdir_path(app_db_path: &PathBuf) -> Option<PathBuf> {
@@ -66,10 +79,68 @@ pub fn glob_path_by_wfname(epi2me: &Epi2meSetup, project: &String) -> Option<Pat
 }
 
 
+fn workflows_to_polars(path: &PathBuf) -> Option<DataFrame> {
+    println!("\tparsing workflows from path [{:?}]", path);
+
+    let globpat = &path.clone().into_os_string().into_string().unwrap();
+    let path_pattern = [&globpat, "/*/*"].join("");
+    let mut wfs: Vec<Workflow> = Vec::new();
+
+    for entry in glob(&path_pattern).expect("Failed to read glob pattern") {
+        match entry {
+            Ok(mut globpath) => {
+                
+                let mut config_path = globpath.clone();
+                config_path.push("nextflow.config");
+                let globpathstr = globpath.as_os_str().to_str().unwrap();
+                if globpath.is_dir() && !globpathstr.contains(".nextflow") {
+                    let workflow = globpath.file_name().unwrap().to_str().unwrap().to_string();
+                    globpath.pop();
+                    let project = globpath.file_name().unwrap().to_str().unwrap().to_string();
+
+                    // extract workflow revision for the linked artifact
+                    // this is probably best prepared by parsing the information from the config file?
+                    if config_path.exists() {
+                        let contents = fs::read_to_string(&config_path).unwrap();
+                        let config = nextflow_parser(&contents);
+                        let version = config.get("manifest.version").unwrap();
+
+                        let w = Workflow{
+                            project: project,
+                            name: workflow,
+                            version: String::from(version),
+                        };
+                        wfs.push(w);
+
+                    }
+                }
+            },
+            Err(e) => println!("{:?}", e),
+        }
+    }
+
+    let df = workflow_vec_to_df(wfs);
+    return Some(df);
+
+    /* 
+    let myd: DataFrame = struct_to_dataframe!(wfs, [project,
+        name,
+        version]).unwrap();
+    */
+
+}
+
+
 pub fn workflow_manager(list: &bool) {
     
+    let src_dir = epi2me_db::find_db().unwrap().epi2wf_dir;
+
     if *list {
-        println!("Listing installed bioinformatics workflows");
+        println!("Listing installed bioinformatics workflows from [{:?}]", &src_dir);
+        let df = workflows_to_polars(&src_dir);
+        if df.is_some() {
+            print_polars_df(&df.unwrap());
+        }
     }
 
 }
