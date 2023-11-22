@@ -11,7 +11,6 @@ use stringreader::StringReader;
 use std::fs::File;
 use std::io::{BufReader, Read};
 
-
 use crate::epi2me_db;
 use crate::json::{get_manifest_str, write_manifest_str};
 use crate::manifest::{MANIFEST_JSON, Epi2MeManifest, touch_manifest};

@@ -77,6 +77,14 @@ enum Datatypes {
         #[arg(num_args(0..), short, long)]
         workflow: Vec<String>,
 
+        /// target twome archive file
+        #[arg(short, long)]
+        twome: Option<String>,
+
+        /// force overwrite of exising twome archive
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        force: bool,
+
     },
 
     /// containers used by the EPI2ME software
@@ -173,8 +181,8 @@ async fn main() {
                     dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename, housekeeping, clone);
                 },
 
-                Some(Datatypes::Workflow { list, workflow }) => {
-                    workflow_manager(list, workflow);
+                Some(Datatypes::Workflow { list, workflow, twome, force }) => {
+                    workflow_manager(list, workflow, twome, force);
                 },
 
                 Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid }) => {

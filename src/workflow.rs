@@ -131,11 +131,12 @@ fn workflows_to_polars(path: &PathBuf) -> Option<DataFrame> {
 }
 
 
-pub fn workflow_manager(list: &bool, workflow: &Vec<String>) {
+pub fn workflow_manager(list: &bool, workflow: &Vec<String>, twome: &Option<String>, force: &bool) {
     
     let src_dir = epi2me_db::find_db().unwrap().epi2wf_dir;
     let df = workflows_to_polars(&src_dir);
     let df2 = df.as_ref().unwrap();
+    let mut picked = DataFrame::default();
 
     if *list {
         println!("Listing installed bioinformatics workflows from [{:?}]", &src_dir);
@@ -163,6 +164,7 @@ pub fn workflow_manager(list: &bool, workflow: &Vec<String>) {
         let filtered_df = two_field_filter(&df2, &String::from("project"), &String::from(project), &String::from("name"), &String::from(name)); 
         if filtered_df.is_none() {
             eprintln!("unexpected failure - failed to find appropriate workflow installation");
+            return;
         }
         let filtered = filtered_df.unwrap();
         let height = filtered.height();
@@ -173,7 +175,16 @@ pub fn workflow_manager(list: &bool, workflow: &Vec<String>) {
             eprintln!("specified workflow installation is ambiguous [{}]", &workflow_id);
             return;
         }
-        print_polars_df(&filtered);
+        // print_polars_df(&filtered);
+        if picked.is_empty() {
+            picked = filtered;
+        } else {
+            let repicked = picked.vstack(&filtered);
+            if repicked.is_ok() {
+                picked = repicked.unwrap();
+            }
+        }
     }
+    print_polars_df(&picked);
 
 }
