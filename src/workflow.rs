@@ -2,7 +2,7 @@ use std::{path::PathBuf, fs};
 use glob::glob;
 use polars_core::prelude::DataFrame;
 use serde::{Serialize, Deserialize};
-use crate::{epi2me_db::{Epi2meSetup, self}, docker::nextflow_parser, dataframe::{workflow_vec_to_df, print_polars_df, two_field_filter}};
+use crate::{epi2me_db::{Epi2meSetup, self}, docker::nextflow_parser, dataframe::{workflow_vec_to_df, print_polars_df, two_field_filter}, bundle::export_nf_workflow, manifest::Epi2meWorkflow};
 
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -13,8 +13,14 @@ pub struct Workflow {
     pub version: String,
 }
 
-
-
+pub fn get_workflow_struct(p: &String, n: &String, v: &String) -> Epi2meWorkflow {
+    return Epi2meWorkflow {
+        project: String::from(p),
+        name: String::from(n),
+        version: String::from(v),
+        ..Default::default()
+    };
+}
 
 pub fn get_epi2me_wfdir_path(app_db_path: &PathBuf) -> Option<PathBuf> {
     let mut x = app_db_path.clone();
@@ -103,7 +109,11 @@ fn workflows_to_polars(path: &PathBuf) -> Option<DataFrame> {
                     if config_path.exists() {
                         let contents = fs::read_to_string(&config_path).unwrap();
                         let config = nextflow_parser(&contents);
-                        let version = config.get("manifest.version").unwrap();
+                        let mut version = String::from("?");
+                        let man_version = config.get("manifest.version");
+                        if man_version.is_some() {
+                            version = String::from(man_version.unwrap());
+                        }
 
                         let w = Workflow{
                             project: project,
@@ -150,6 +160,11 @@ pub fn workflow_manager(list: &bool, workflow: &Vec<String>, twome: &Option<Stri
         return;
     }
 
+    if twome.is_none() {
+        eprintln!("A `--twome` parameter is required to define output tar archive");
+        return;
+    }
+
     for workflow_id in workflow {
         println!("processing workflow [{}]", &workflow_id);
         
@@ -186,5 +201,8 @@ pub fn workflow_manager(list: &bool, workflow: &Vec<String>, twome: &Option<Stri
         }
     }
     print_polars_df(&picked);
+
+    // and now export into an archive ...
+    export_nf_workflow(&picked);
 
 }

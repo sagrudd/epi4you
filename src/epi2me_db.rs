@@ -1,6 +1,7 @@
-use std::{path::PathBuf, fs};
+use std::{path::PathBuf, fs::{self, create_dir_all}};
 
 use home;
+use ulid::Ulid;
 use crate::{json, workflow};
 
 
@@ -63,6 +64,21 @@ pub fn find_db() -> Option<Epi2meSetup> {
         }
     }
 
+    return None;
+}
+
+
+pub fn get_tempdir() -> Option<PathBuf> {
+    let x = find_db();
+    if x.is_some() {
+        let mut epi4you = x.unwrap().epi4you_path;
+        let ulid_str = Ulid::new().to_string();
+        epi4you.push(ulid_str);
+        let status = create_dir_all(&epi4you);
+        if status.is_ok() {
+            return Some(epi4you);
+        }
+    }
     return None;
 }
 

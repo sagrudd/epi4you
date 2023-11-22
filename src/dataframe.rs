@@ -69,6 +69,14 @@ pub fn filter_df_by_value(df: &DataFrame, column: &String, value: &String) -> Re
     .filter(col(column).is_in(lit(Series::from_iter(vec![String::from(value)])))).collect();
 }
 
+
+pub fn get_zero_val(df: &DataFrame, col: &String) -> String {
+    let idx = df.find_idx_by_name(col).unwrap();
+    let ser = df.select_at_idx(idx).unwrap().clone();
+    let chunked_array: Vec<Option<&str>> = ser.utf8().unwrap().into_iter().collect();
+    return String::from(chunked_array[0].unwrap());
+}
+
 pub fn two_field_filter(df: &DataFrame, c1: &String, c1val: &String, c2: &String, c2val: &String) -> Option<DataFrame> {
     let first_field = filter_df_by_value(&df, c1, c1val);
     if first_field.is_ok() {

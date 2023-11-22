@@ -93,6 +93,30 @@ impl Default for Epi2meDesktopAnalysis {
 #[derive(Serialize, Deserialize)]
 #[derive(Clone)]
 #[derive(Debug)]
+#[allow(non_snake_case)]
+pub struct Epi2meWorkflow {
+    pub project: String,
+    pub name: String,
+    pub version: String,
+    pub files: Vec<FileManifest>,
+}
+
+impl Default for Epi2meWorkflow {
+    fn default() -> Epi2meWorkflow {
+
+        Epi2meWorkflow {
+            project: String::from("undefined"),
+            name: String::from("undefined"),
+            version: String::from("undefined"),
+            files: Vec::<FileManifest>::new(),
+        }
+    }
+}
+
+
+#[derive(Serialize, Deserialize)]
+#[derive(Clone)]
+#[derive(Debug)]
 #[serde(tag = "type")]
 pub enum Epi2MeContent {
     Epi2mePayload(Epi2meDesktopAnalysis),

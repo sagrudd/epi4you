@@ -8,6 +8,7 @@ use std::{env, fs};
 use std::path::PathBuf;
 use crate::dataframe::analysis_vec_to_df;
 use crate::dataframe::filter_df_by_value;
+use crate::dataframe::get_zero_val;
 use crate::manifest::Epi2meDesktopAnalysis;
 use crate::{workflow, epi2me_db};
 
@@ -71,13 +72,6 @@ fn get_db_id_entry(runid: &String, polardb: &DataFrame) -> Result<DataFrame, Pol
     let df = filter_df_by_value(polardb, &String::from("name"), runid);
     let df2 = filter_df_by_value(polardb, &String::from("id"), runid);
     return df.unwrap().vstack(&df2.unwrap());
-}
-
-fn get_zero_val(df: &DataFrame, col: &String) -> String {
-    let idx = df.find_idx_by_name(col).unwrap();
-    let ser = df.select_at_idx(idx).unwrap().clone();
-    let chunked_array: Vec<Option<&str>> = ser.utf8().unwrap().into_iter().collect();
-    return String::from(chunked_array[0].unwrap());
 }
 
 pub fn get_qualified_analysis_path(runid: &String, polardb: &DataFrame) -> PathBuf {
