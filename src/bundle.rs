@@ -14,7 +14,7 @@ use std::io::{BufReader, Read};
 use crate::epi2me_db::{self, get_tempdir};
 use crate::json::{get_manifest_str, write_manifest_str};
 use crate::manifest::{MANIFEST_JSON, Epi2MeManifest, touch_manifest};
-use crate::workflow;
+use crate::workflow::{self, check_defined_wfdir_exists};
 use crate::{manifest::{get_manifest, Epi2MeContent, FileManifest}, app_db, epi2me_tar};
 
 
@@ -70,7 +70,10 @@ fn anyvalue_to_str(value: Option<&AnyValue>) -> String {
 }
 
 
-pub fn export_nf_workflow(source: &DataFrame) {
+pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>) {
+    // core path 
+    //let core_path = epi2me_db::find_db().unwrap().epi2wf_dir;
+    let local_prefix = epi2me_db::find_db().unwrap().epi2path;
 
     // create a temporary path for this export exploration
     let tempdir = get_tempdir();
@@ -80,6 +83,7 @@ pub fn export_nf_workflow(source: &DataFrame) {
     let temp_dir = tempdir.unwrap();
     println!("using tempdir at [{:?}]", &temp_dir);
     let mut manifest = get_manifest(&temp_dir).unwrap();
+    let mut all_files: Vec<FileManifest> = Vec::new();
 
     for idx in 0..source.height() {
 
@@ -93,11 +97,48 @@ pub fn export_nf_workflow(source: &DataFrame) {
             let merged = vec![String::from(&project), String::from(&name)].join("/");
             println!("We have some data {}", merged);
 
-            let zz = workflow::get_workflow_struct(&project, &name, &version);
-            println!("{:?}", zz);
-        }
-        
+            let mut vehicle = workflow::get_workflow_struct(&project, &name, &version);
+            
+            println!("{:?}", vehicle);
+
+            let wf_path = check_defined_wfdir_exists(&local_prefix, &project, &name);
+            println!("Mining files from [{:?}]", wf_path);
+
+            let (files_size, files) = fish_files(&wf_path.unwrap(), &local_prefix);
+            for file_obj in &files {
+                vehicle.files.push(file_obj.to_owned());
+                all_files.push(file_obj.to_owned());
+            }
+
+            let filecount = files.len();
+            //let filecontext = files.clone();
+
+            manifest.payload.push( Epi2MeContent::Epi2meWorkflow(vehicle) );
+            manifest.filecount += u8::try_from(filecount).unwrap(); 
+            manifest.files_size += files_size;  
+        }   
     }
+
+    println!("{}", get_manifest_str(&manifest).as_str());
+
+    let manifest_signature = sha256_str_digest(get_manifest_str(&manifest).as_str());
+    manifest.signature = manifest_signature;
+
+    // add the file manifest to the manifest
+    let mut manifest_pb = temp_dir.clone();
+    manifest_pb.push(MANIFEST_JSON);
+    write_manifest_str(&manifest, &manifest_pb);
+
+    // as per https://github.com/sagrudd/epi4you/issues/1 - ensure that destination is not in source
+    let dest = PathBuf::from(twome.clone().unwrap());
+    let common_prefix = &dest.strip_prefix(&local_prefix);
+    if !common_prefix.is_err() {
+        eprintln!("Destination is a child of source - this will not work!");
+        return;
+    }
+
+    // tar up the contents specified in the manifest
+    epi2me_tar::tar(dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
 
     // cleanup temporary content ...
     let sanitise = remove_dir_all(&temp_dir);

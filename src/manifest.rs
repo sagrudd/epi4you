@@ -28,33 +28,6 @@ impl Default for FileManifest {
 #[derive(Serialize, Deserialize)]
 #[derive(Clone)]
 #[derive(Debug)]
-pub struct Epi2MEWorkflow {
-    pub workflow_name: String,
-    pub workflow_user: String,
-    pub workflow_version: String,
-    pub workflow_commit: String,
-    pub workflow_source: String,
-    pub files: Vec<FileManifest>,
-}
-
-impl Default for Epi2MEWorkflow {
-    fn default() -> Epi2MEWorkflow {
-
-        Epi2MEWorkflow {
-            workflow_name: String::from("undefined"),
-            workflow_user: String::from("undefined"),
-            workflow_version: String::from("undefined"),
-            workflow_commit: String::from("undefined"),
-            workflow_source: String::from("undefined"),
-            files: Vec::<FileManifest>::new(),
-        }
-    }
-}
-
-
-#[derive(Serialize, Deserialize)]
-#[derive(Clone)]
-#[derive(Debug)]
 #[allow(non_snake_case)]
 pub struct Epi2meDesktopAnalysis {
     pub id: String,
@@ -120,7 +93,7 @@ impl Default for Epi2meWorkflow {
 #[serde(tag = "type")]
 pub enum Epi2MeContent {
     Epi2mePayload(Epi2meDesktopAnalysis),
-    Epi2MEWorkflow(Epi2MEWorkflow),
+    Epi2meWorkflow(Epi2meWorkflow),
   }
 
 
@@ -254,12 +227,12 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> Option<
 
         for cfile in &manifest.payload {
             let is_desktop_payload = matches!(cfile, Epi2MeContent::Epi2mePayload { .. });
-            let is_epi2me_workflow = matches!(cfile, Epi2MeContent::Epi2MEWorkflow { .. });
+            let is_epi2me_workflow = matches!(cfile, Epi2MeContent::Epi2meWorkflow { .. });
             println!("Epi2mePayload :: {:?}", is_desktop_payload);
             println!("Epi2meWorkflow :: {:?}", is_epi2me_workflow);
 
             match cfile {
-                Epi2MeContent::Epi2MEWorkflow { .. } => println!("Epi2MEWorkflow"),
+                Epi2MeContent::Epi2meWorkflow { .. } => println!("Epi2MEWorkflow"),
                 
                 Epi2MeContent::Epi2mePayload(desktop_analysis) => {
                     println!("Epi2MEWorkflow");
@@ -292,7 +265,7 @@ pub fn import_resolved_content(content: &Vec<Epi2MeContent>) {
     for cfile in content {
 
         match cfile {
-            Epi2MeContent::Epi2MEWorkflow { .. } => println!("Epi2MEWorkflow"),
+            Epi2MeContent::Epi2meWorkflow { .. } => println!("Epi2MEWorkflow"),
             
             Epi2MeContent::Epi2mePayload(desktop_analysis) => {
                 println!("importing DesktopAnalysis[{}]", &desktop_analysis.id);

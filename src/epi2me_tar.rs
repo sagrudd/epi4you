@@ -24,8 +24,11 @@ pub fn tar(tarfile: PathBuf, files: &Vec<FileManifest>, manifest: &PathBuf) {
     }
 
     println!("writing manifest {:?}", manifest);
+    //let _ = env::set_current_dir(&manifest.parent().unwrap());
     let _ = a.append_path(manifest);
 
+
+    
 }
 
 

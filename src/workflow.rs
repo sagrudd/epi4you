@@ -35,6 +35,7 @@ pub fn get_epi2me_wfdir_path(app_db_path: &PathBuf) -> Option<PathBuf> {
 
 pub fn check_defined_wfdir_exists(wfdir: &PathBuf, user: &str, repo: &str) -> Option<PathBuf> {
     let mut x = wfdir.clone();
+    x.push(String::from("workflows"));
     x.push(user);
     x.push(repo);
     if x.exists() && x.is_dir() {
@@ -203,6 +204,6 @@ pub fn workflow_manager(list: &bool, workflow: &Vec<String>, twome: &Option<Stri
     print_polars_df(&picked);
 
     // and now export into an archive ...
-    export_nf_workflow(&picked);
+    export_nf_workflow(&picked, twome);
 
 }
