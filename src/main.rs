@@ -1,11 +1,11 @@
-use std::path::{PathBuf, Path};
+use std::path::PathBuf;
 
 use app_db::dbmanager;
 use clap::{Parser, Subcommand, ArgAction};
 use dataframe::print_polars_df;
 use docker::docker_agent;
+use epi2me_db::epi2me_manager;
 use manifest::load_manifest_from_tarball;
-use path_clean::PathClean;
 use workflow::workflow_manager;
 
 mod epi2me_db;
@@ -217,62 +217,7 @@ async fn main() {
                 },
 
                 Some(Datatypes::EPI2ME { list, bundlewf, runid, twome, force }) => {
-                    println!("epi2me.list == {}",*list);
-                    if *list {
-                        app_db::print_appdb(&df.unwrap());
-                    } else {
-                        if runid.is_none() {
-                            println!("EPI2ME analysis twome archiving requires a --runid identifier (name or id)");
-                            return;
-                        } else {
-                            if !app_db::validate_db_entry(&runid.as_ref().unwrap().to_string(), df.as_ref().unwrap()) {
-                                return;
-                            }
-                        }
-
-                        let runid_str = &runid.as_ref().unwrap().to_string();
-                        let polardb = df.as_ref().unwrap();
-
-                        if twome.is_none() {
-                            println!("EPI2ME twome archiving requires a --twome <file> target to writing to");
-                            return; 
-                        } else {
-                            let pb = PathBuf::from(twome.as_ref().unwrap());
-                            if pb.exists() {
-                                if pb.is_file() && !force {
-                                    println!("twome file specified already exists - either --force or use different name");
-                                    return;
-                                } else if pb.is_dir() {
-                                    println!("twome file is a directory - file is required");
-                                    return;
-                                } 
-                            }    
-                        }
-
-                        let mut bundle_workflow: Option<PathBuf> = None;
-                        if bundlewf == &true {
-                            // ensure that a workflow for bundling is intact ...
-                            bundle_workflow = app_db::validate_qualified_analysis_workflow(
-                                &runid_str.to_string(), 
-                                polardb, &epi2me.epi2wf_dir,
-                            )
-                        }
-
-                        // if we are here we have a destination and a unique runid - let's sanity check the destination PATH
-                        // there is some broken logic as described in https://github.com/sagrudd/epi4you/issues/1
-                        let path = Path::new(twome.as_ref().unwrap());
-                        let mut absolute_path;
-                        if path.is_absolute() {
-                            absolute_path = path.to_path_buf();
-                        } else {
-                            absolute_path = env::current_dir().unwrap().join(path);
-                        }
-                        absolute_path = absolute_path.clean();
-                        println!("tar .2me archive to be written to [{:?}]", absolute_path);
-
-                        // we have a destination and a unique runid - let's package something ...
-                        bundle::export_desktop_run(&runid_str, polardb, Some(absolute_path), bundle_workflow);
-                    }
+                    epi2me_manager(&epi2me, &df.unwrap(), list, runid, twome, force, bundlewf);
                 },
 
                 Some(Datatypes::Import { twome, force}) => {
