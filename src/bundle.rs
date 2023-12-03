@@ -12,7 +12,7 @@ use std::io::{BufReader, Read};
 
 use crate::epi2me_db::{self, get_tempdir};
 use crate::json::{get_manifest_str, write_manifest_str};
-use crate::manifest::{MANIFEST_JSON, Epi2MeManifest, touch_manifest};
+use crate::manifest::{MANIFEST_JSON, Epi2MeManifest, touch_manifest, Epi2meWorkflow, file_manifest_size};
 use crate::workflow::{self, check_defined_wfdir_exists};
 use crate::{manifest::{get_manifest, Epi2MeContent, FileManifest}, app_db, epi2me_tar};
 
@@ -68,6 +68,19 @@ fn anyvalue_to_str(value: Option<&AnyValue>) -> String {
     return String::from("Err!");
 }
 
+pub fn get_workflow_vehicle(project: &String, name: &String, version: &String) -> Epi2meWorkflow {
+    let local_prefix = epi2me_db::find_db().unwrap().epi2path;
+    let mut vehicle = workflow::get_workflow_struct(&project, &name, &version);
+            
+    println!("{:?}", vehicle);
+
+    let wf_path = check_defined_wfdir_exists(&local_prefix, &project, &name);
+    println!("Mining files from [{:?}]", wf_path);
+
+    vehicle.files = fish_files(&wf_path.unwrap(), &local_prefix);
+    return vehicle;
+}
+
 
 pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>, force: &bool) {
     // core path 
@@ -96,25 +109,16 @@ pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>, force: &bo
             let merged = vec![String::from(&project), String::from(&name)].join("/");
             println!("We have some data {}", merged);
 
-            let mut vehicle = workflow::get_workflow_struct(&project, &name, &version);
-            
-            println!("{:?}", vehicle);
+            let vehicle = get_workflow_vehicle(&project, &name, &version);
 
-            let wf_path = check_defined_wfdir_exists(&local_prefix, &project, &name);
-            println!("Mining files from [{:?}]", wf_path);
+            let filecount = vehicle.files.len();
+            let filesize = file_manifest_size(&vehicle.files);
 
-            let (files_size, files) = fish_files(&wf_path.unwrap(), &local_prefix);
-            for file_obj in &files {
-                vehicle.files.push(file_obj.to_owned());
-                all_files.push(file_obj.to_owned());
-            }
-
-            let filecount = files.len();
-            //let filecontext = files.clone();
+            all_files.extend(vehicle.files.clone());
 
             manifest.payload.push( Epi2MeContent::Epi2meWf(vehicle) );
-            manifest.filecount += u8::try_from(filecount).unwrap(); 
-            manifest.files_size += files_size;  
+            manifest.filecount += u64::try_from(filecount).unwrap(); 
+            manifest.files_size += filesize;  
         }   
     }
 
@@ -151,7 +155,7 @@ pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>, force: &bo
 }
 
 
-fn fish_files(source: &PathBuf, local_prefix: &PathBuf) -> (u64, Vec<FileManifest>) {
+fn fish_files(source: &PathBuf, local_prefix: &PathBuf) -> Vec<FileManifest> {
 
     let globpat = &source.clone().into_os_string().into_string().unwrap();
     let result = [&globpat, "/**/*.*"].join("");
@@ -161,8 +165,6 @@ fn fish_files(source: &PathBuf, local_prefix: &PathBuf) -> (u64, Vec<FileManifes
     println!("fishing for files at [{}]", result);
 
     let _ = env::set_current_dir(&globpat);
-
-    let mut files_size: u64 = 0;
 
     for entry in glob(&result).expect("Failed to read glob pattern") {
         if entry.is_ok() {
@@ -181,7 +183,6 @@ fn fish_files(source: &PathBuf, local_prefix: &PathBuf) -> (u64, Vec<FileManifes
                 
                 //println!("file [{}] with checksum [{}]", &fp, &vv);
                 let file_size = e.metadata().unwrap().len();
-                files_size += file_size;
 
                 files.push(FileManifest {
                     filename: String::from(e.file_name().unwrap().to_os_string().to_str().unwrap()),
@@ -192,11 +193,11 @@ fn fish_files(source: &PathBuf, local_prefix: &PathBuf) -> (u64, Vec<FileManifes
             }
         }
     }
-    return (files_size, files);
+    return files;
 }
 
 
-pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Option<PathBuf>, _bundlewf: Option<PathBuf>) {
+pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Option<PathBuf>, bundlewf: Option<PathBuf>, project: Option<String>, name: Option<String>, version: Option<String>) {
     let source_opt = Some(app_db::get_qualified_analysis_path(&runid, polardb));
     let local_prefix = epi2me_db::find_db().unwrap().epi2path;
 
@@ -217,72 +218,30 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
             } else {
                 touch_manifest(&mut manifest)
             }
+            let mut all_files: Vec<FileManifest> = Vec::new();
 
             let mut vehicle = zz.unwrap();
+            vehicle.files = fish_files(&source, &local_prefix);
+            all_files.extend(vehicle.files.clone());
 
-            // load the files into the Epi2meDesktopAnalysis struct
-            //let mut files = Vec::<FileManifest>::new();
-
-            /* 
-
-            let globpat = &source.clone().into_os_string().into_string().unwrap();
-            let result = [&globpat, "/**/*.*"].join("");
-
-            println!("fishing for files at [{}]", result);
-
-            let _ = env::set_current_dir(&globpat);
-
-            let mut files_size: u64 = 0;
-
-            for entry in glob(&result).expect("Failed to read glob pattern") {
-                if entry.is_ok() {
-                    let e = entry.unwrap();
-                    let fname =  &e.file_name().and_then(|s| s.to_str());
-                    if e.is_file() && !fname.unwrap().contains("4u_manifest.json") { // don't yet package the manifest - it'll be added later
-                        let fp = e.as_os_str().to_str().unwrap();
-
-                        let mut parent = e.clone();
-                        let _ = parent.pop();
-
-                        let relative_path = clip_relative_path(&e, &local_prefix);
-                        //println!("{}", &fp);
-
-                        let checksum = sha256_digest(&fp);
-                        
-                        //println!("file [{}] with checksum [{}]", &fp, &vv);
-                        let file_size = e.metadata().unwrap().len();
-                        files_size += file_size;
-
-                        vehicle.files.push(FileManifest {
-                            filename: String::from(e.file_name().unwrap().to_os_string().to_str().unwrap()),
-                            relative_path: String::from(relative_path.clone().to_string_lossy().to_string()),
-                            size: file_size,
-                            md5sum: checksum,
-                        })
-                    }
-                }
-            }
-            */
-
-            let (files_size, files) = fish_files(&source, &local_prefix);
-            for file_obj in &files {
-                vehicle.files.push(file_obj.to_owned());
-            }
-
-            let filecount = files.len();
-            //let filecontext = files.clone();
-
+            manifest.filecount += u64::try_from(vehicle.files.len()).unwrap();
+            manifest.files_size += file_manifest_size(&vehicle.files);
             manifest.payload.push( Epi2MeContent::Epi2mePayload(vehicle) );
-            manifest.filecount = u8::try_from(filecount).unwrap(); 
-            manifest.files_size = files_size;  
 
-            println!("{:?}", get_manifest_str(&manifest).as_str());
+            if bundlewf.is_some() {
+                println!("bundling [{:?}]", bundlewf);
+                let wf_vehicle = get_workflow_vehicle(&project.unwrap(), &name.unwrap(), &version.unwrap());
+                
+                // println!("{:?}", wf_vehicle);
+                all_files.extend(wf_vehicle.files.clone());
+                manifest.filecount += u64::try_from(wf_vehicle.files.len()).unwrap();
+                manifest.files_size += file_manifest_size(&wf_vehicle.files);
+                manifest.payload.push( Epi2MeContent::Epi2meWf(wf_vehicle) );           
+            }
 
             let manifest_signature = sha256_str_digest(get_manifest_str(&manifest).as_str());
             manifest.signature = manifest_signature;
             
-            // add the file manifest to the manifest
-
             let mut manifest_pb = source.clone();
             manifest_pb.push(MANIFEST_JSON);
             write_manifest_str(&manifest, &manifest_pb);
@@ -296,7 +255,7 @@ pub fn export_desktop_run(runid: &String, polardb: &DataFrame, destination: Opti
             }
 
             // tar up the contents specified in the manifest
-            epi2me_tar::tar(dest, &files, &get_relative_path(&manifest_pb, &local_prefix));
+            epi2me_tar::tar(dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
         }
     }
 }

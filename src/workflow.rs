@@ -42,6 +42,7 @@ pub fn check_defined_wfdir_exists(wfdir: &PathBuf, user: &str, repo: &str) -> Op
         println!("\tdefined workflow folder exists at [{}]", x.display());
         return Some(x.clone());
     }
+    eprintln!("\tworkflow folder does not exist at [{}]", x.display());
     return None;
 }
 

@@ -105,7 +105,7 @@ pub struct Epi2MeManifest {
     pub src_path: String,
     pub provenance: Vec<Epi2MeProvenance>,
     pub payload: Vec<Epi2MeContent>,
-    pub filecount: u8,
+    pub filecount: u64,
     pub files_size: u64,
 
     pub signature: String,
@@ -126,7 +126,7 @@ impl Default for Epi2MeManifest {
 }
 
 
-pub fn get_manifest_path(source: &PathBuf) -> PathBuf {
+fn _get_manifest_path(source: &PathBuf) -> PathBuf {
     let mut manifest = source.clone();
     manifest.push(MANIFEST_JSON);
     return manifest;
@@ -134,8 +134,17 @@ pub fn get_manifest_path(source: &PathBuf) -> PathBuf {
 
 
 
-pub fn get_manifest(source: &PathBuf) -> Option<Epi2MeManifest> {
-        let manifest = get_manifest_path(source);
+pub fn get_manifest(_source: &PathBuf) -> Option<Epi2MeManifest> {
+
+    let mut man: Epi2MeManifest = Epi2MeManifest{
+        ..Default::default()
+    };
+    let prov = append_provenance(String::from("manifest_created"), None, None, String::from(""));
+    let _ = &man.provenance.push(prov);
+    wrangle_manifest(&man);
+    return Some(man);
+
+        /*let manifest = get_manifest_path(source);
         if !manifest.exists() {
             // we need to create one
             println!("creating a new manifest");
@@ -158,8 +167,8 @@ pub fn get_manifest(source: &PathBuf) -> Option<Epi2MeManifest> {
 
             let epi2me_manifest: Epi2MeManifest =
                 serde_json::from_reader(json_file).expect("error while reading json");
-            return Some(epi2me_manifest);
-        }
+            return Some(epi2me_manifest); 
+        }  */
 
 }
 
@@ -171,7 +180,13 @@ pub fn touch_manifest(man: &mut Epi2MeManifest) {
 }
 
 
-
+pub fn file_manifest_size(files: &Vec<FileManifest>) -> u64 {
+    let mut size: u64 = 0;
+    for file in files {
+        size += file.size;
+    }
+    return size;
+}
 
 
 pub fn load_manifest_from_tarball(twome: &PathBuf) -> Option<Epi2MeManifest> {

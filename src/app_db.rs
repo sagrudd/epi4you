@@ -80,27 +80,28 @@ pub fn get_qualified_analysis_path(runid: &String, polardb: &DataFrame) -> PathB
 }
 
 
-pub fn validate_qualified_analysis_workflow(runid: &String, polardb: &DataFrame, epi2wf_dir: &PathBuf) -> Option<PathBuf> {
-    let stacked = get_db_id_entry(runid, polardb).unwrap();
 
-    let workflow_user = get_zero_val(&stacked, &String::from("workflowUser"));
-    let workflow_repo = get_zero_val(&stacked, &String::from("workflowRepo"));
+pub fn validate_qualified_analysis_workflow(runid: &String, polardb: &DataFrame, epi2wf_dir: &PathBuf) -> (Option<PathBuf>, Option<String>, Option<String>, Option<String>) {
     
+    let stacked = get_db_id_entry(runid, polardb).unwrap();
+    let wf_proj = get_zero_val(&stacked, &String::from("workflowUser"));
+    let wf_repo = get_zero_val(&stacked, &String::from("workflowRepo"));
+    let wf_vers = get_zero_val(&stacked, &String::from("workflowVersion"));
+
     let mut workflow: String = String::new();
     
-    workflow.push_str(&workflow_user);
+    workflow.push_str(&wf_proj);
     workflow.push_str(&std::path::MAIN_SEPARATOR.to_string());
-    workflow.push_str(&workflow_repo);
-    
+    workflow.push_str(&wf_repo);
     println!("repo {}", workflow);
 
     // let's check that the path exists ...
-    let wfdir_exists = workflow::check_defined_wfdir_exists(epi2wf_dir, &workflow_user, &workflow_repo);
+    let wfdir_exists = workflow::check_defined_wfdir_exists(epi2wf_dir, &wf_proj, &wf_repo);
     if wfdir_exists.is_some() {
-        return wfdir_exists;
+        return (wfdir_exists, Some(wf_proj), Some(wf_repo), Some(wf_vers));
     }
 
-    return None;
+    return (None, None, None, None);
 }
 
 

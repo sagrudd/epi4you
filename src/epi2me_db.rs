@@ -167,12 +167,26 @@ pub fn epi2me_manager(epi2me: &Epi2meSetup, df: &DataFrame, list: &bool, runid: 
         }
 
         let mut bundle_workflow: Option<PathBuf> = None;
+        let mut wf_proj: Option<String> = None;
+        let mut wf_name: Option<String> = None;
+        let mut wf_vers: Option<String> = None;
+
         if bundlewf == &true {
             // ensure that a workflow for bundling is intact ...
-            bundle_workflow = app_db::validate_qualified_analysis_workflow(
+            let (xbundle_workflow, xwf_proj, xwf_name, xwf_vers) = app_db::validate_qualified_analysis_workflow(
                 &runid_str.to_string(), 
-                &polardb, &epi2me.epi2wf_dir,
-            )
+                &polardb, &epi2me.epi2path,
+            );
+            if xbundle_workflow.is_none() {
+                eprintln!("This workflow may be an orphan - cannot continue");
+                return;
+            } else {
+                bundle_workflow = xbundle_workflow; 
+                wf_proj = xwf_proj;
+                wf_name = xwf_name;
+                wf_vers = xwf_vers;
+                println!("workflow instance found at [{:?}]", bundle_workflow);
+            }
         }
 
         // if we are here we have a destination and a unique runid - let's sanity check the destination PATH
@@ -188,6 +202,6 @@ pub fn epi2me_manager(epi2me: &Epi2meSetup, df: &DataFrame, list: &bool, runid: 
         println!("tar .2me archive to be written to [{:?}]", absolute_path);
 
         // we have a destination and a unique runid - let's package something ...
-        bundle::export_desktop_run(&runid_str, &polardb, Some(absolute_path), bundle_workflow);
+        bundle::export_desktop_run(&runid_str, &polardb, Some(absolute_path), bundle_workflow, wf_proj, wf_name, wf_vers);
     }
 }
