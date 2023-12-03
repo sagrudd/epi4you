@@ -1,7 +1,7 @@
 use std::{path::PathBuf, fs::File, io::Read};
 use tar::Archive;
 use serde::{Serialize, Deserialize};
-use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::{sha256_str_digest, sha256_digest}, epi2me_tar::untar, app_db::insert_untarred_desktop_analysis};
+use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::{sha256_str_digest, sha256_digest}, epi2me_tar::untar, app_db::insert_untarred_desktop_analysis, workflow::insert_untarred_workflow};
 
 pub static MANIFEST_JSON: &str = "4u_manifest.json";
 
@@ -93,7 +93,7 @@ impl Default for Epi2meWorkflow {
 #[serde(tag = "type")]
 pub enum Epi2MeContent {
     Epi2mePayload(Epi2meDesktopAnalysis),
-    Epi2meWorkflow(Epi2meWorkflow),
+    Epi2meWf(Epi2meWorkflow),
   }
 
 
@@ -205,6 +205,24 @@ pub fn load_manifest_from_tarball(twome: &PathBuf) -> Option<Epi2MeManifest> {
 }
 
 
+fn validate_manifest_files(file_manifest: &Vec<FileManifest>) -> Option<bool> {
+    for file in file_manifest {
+        println!("file [{:?}]", file);
+        let file_to_check = PathBuf::from(&file.relative_path).join(PathBuf::from(&file.filename));
+        if !file_to_check.exists() {
+            eprintln!("error - file [{:?}] is missing", file_to_check);
+            return None;
+        }
+        let digest = sha256_digest(&file_to_check.to_str().unwrap());
+        if !(&digest == &file.md5sum) {
+            eprintln!(" error checksum inconsistency - {digest}");
+            return None;
+        }
+    }
+    return Some(true);
+}
+
+
 pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> Option<Vec<Epi2MeContent>> {
 
     let mut successful_content: Vec<Epi2MeContent> = Vec::new();
@@ -227,27 +245,25 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> Option<
 
         for cfile in &manifest.payload {
             let is_desktop_payload = matches!(cfile, Epi2MeContent::Epi2mePayload { .. });
-            let is_epi2me_workflow = matches!(cfile, Epi2MeContent::Epi2meWorkflow { .. });
+            let is_epi2me_workflow = matches!(cfile, Epi2MeContent::Epi2meWf { .. });
             println!("Epi2mePayload :: {:?}", is_desktop_payload);
             println!("Epi2meWorkflow :: {:?}", is_epi2me_workflow);
 
             match cfile {
-                Epi2MeContent::Epi2meWorkflow { .. } => println!("Epi2MEWorkflow"),
+                Epi2MeContent::Epi2meWf(epi2me_workflow) => {
+                     println!("Epi2MEWorkflow");
+                     let x = validate_manifest_files(&epi2me_workflow.files);
+                     if x.is_none() {
+                        return None;
+                     }
+                     successful_content.push(cfile.clone());
+                },
                 
                 Epi2MeContent::Epi2mePayload(desktop_analysis) => {
                     println!("Epi2MEWorkflow");
-                    for file in &desktop_analysis.files {
-                        println!("file [{:?}]", file);
-                        let file_to_check = PathBuf::from(&file.relative_path).join(PathBuf::from(&file.filename));
-                        if !file_to_check.exists() {
-                            eprintln!("error - file [{:?}] is missing", file_to_check);
-                            return None;
-                        }
-                        let digest = sha256_digest(&file_to_check.to_str().unwrap());
-                        if !(&digest == &file.md5sum) {
-                            eprintln!(" error checksum inconsistency - {digest}");
-                            return None;
-                        }
+                    let x = validate_manifest_files(&desktop_analysis.files);
+                    if x.is_none() {
+                       return None;
                     }
                     // if we are here then the manifest specified files are present and coherent; we're good to go ...
                     successful_content.push(cfile.clone());
@@ -261,16 +277,21 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> Option<
 }
 
 
-pub fn import_resolved_content(content: &Vec<Epi2MeContent>) {
+pub fn import_resolved_content(content: &Vec<Epi2MeContent>, force: &bool) {
+    println!("import_resolved_content");
     for cfile in content {
-
+        println!("cfile instance ...");
+        
         match cfile {
-            Epi2MeContent::Epi2meWorkflow { .. } => println!("Epi2MEWorkflow"),
+            Epi2MeContent::Epi2meWf(epi2me_workflow) => {
+                println!("importing Workflow [{}]", epi2me_workflow.name);
+                insert_untarred_workflow(epi2me_workflow, force);
+            },
             
             Epi2MeContent::Epi2mePayload(desktop_analysis) => {
                 println!("importing DesktopAnalysis[{}]", &desktop_analysis.id);
                 insert_untarred_desktop_analysis(desktop_analysis);
-            }
+            },
         }
     }
 }

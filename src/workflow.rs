@@ -142,6 +142,49 @@ fn workflows_to_polars(path: &PathBuf) -> Option<DataFrame> {
 }
 
 
+pub fn insert_untarred_workflow(epi2me_workflow: &Epi2meWorkflow, force: &bool) {
+
+    let e4u_path = epi2me_db::find_db().unwrap().epi4you_path;
+
+    let mut dest_dir = epi2me_db::find_db().unwrap().epi2wf_dir;
+    dest_dir.push(&epi2me_workflow.project);
+    dest_dir.push(&epi2me_workflow.name);
+    println!("workflow_path resolved as {:?}", dest_dir);
+
+    if dest_dir.exists() {
+        if dest_dir.is_dir() {
+            if *force {
+                // nuke the already existing directory - this is with vengeance
+            } else {
+                eprintln!("The workflow directory [{:?}] already exists - consider `--force`", dest_dir);
+                return;
+            }
+        } else if dest_dir.is_file() {
+            eprintln!("The workflow directory [{:?}] already exists as a file - nonsense", dest_dir);
+            return;
+        }
+    }
+
+    for file in &epi2me_workflow.files {
+        let file_to_check = PathBuf::from(&e4u_path).join(&file.relative_path).join(PathBuf::from(&file.filename));
+
+        let target = PathBuf::from(&file.relative_path);
+        let mut t2: PathBuf = target.iter().skip(3).collect();
+        t2.push(&file.filename);
+
+        let mut t3 = dest_dir.clone();
+        t3.push(t2);
+
+        if t3.parent().is_some() && !t3.parent().unwrap().exists() {
+            let _ = fs::create_dir_all(t3.parent().unwrap());
+        }
+        println!("copying file [{:?}]", file_to_check);
+        let _ = fs::copy(file_to_check, t3);
+    }
+
+}
+
+
 pub fn workflow_manager(list: &bool, workflow: &Vec<String>, twome: &Option<String>, force: &bool) {
     
     let src_dir = epi2me_db::find_db().unwrap().epi2wf_dir;
@@ -204,6 +247,6 @@ pub fn workflow_manager(list: &bool, workflow: &Vec<String>, twome: &Option<Stri
     print_polars_df(&picked);
 
     // and now export into an archive ...
-    export_nf_workflow(&picked, twome);
+    export_nf_workflow(&picked, twome, force);
 
 }

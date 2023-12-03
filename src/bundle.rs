@@ -7,7 +7,6 @@ use polars_core::prelude::*;
 use data_encoding::HEXUPPER;
 use ring::digest::{Context, SHA256};
 use stringreader::StringReader;
-use uuid::Version;
 use std::fs::{File, remove_dir_all};
 use std::io::{BufReader, Read};
 
@@ -70,7 +69,7 @@ fn anyvalue_to_str(value: Option<&AnyValue>) -> String {
 }
 
 
-pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>) {
+pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>, force: &bool) {
     // core path 
     //let core_path = epi2me_db::find_db().unwrap().epi2wf_dir;
     let local_prefix = epi2me_db::find_db().unwrap().epi2path;
@@ -113,7 +112,7 @@ pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>) {
             let filecount = files.len();
             //let filecontext = files.clone();
 
-            manifest.payload.push( Epi2MeContent::Epi2meWorkflow(vehicle) );
+            manifest.payload.push( Epi2MeContent::Epi2meWf(vehicle) );
             manifest.filecount += u8::try_from(filecount).unwrap(); 
             manifest.files_size += files_size;  
         }   
@@ -137,8 +136,12 @@ pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>) {
         return;
     }
 
-    // tar up the contents specified in the manifest
-    epi2me_tar::tar(dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
+    if dest.exists() && !*force {
+        eprintln!("destination archive already exists - cannot continue without `--force`")
+    } else {
+        // tar up the contents specified in the manifest
+        epi2me_tar::tar(dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
+    }
 
     // cleanup temporary content ...
     let sanitise = remove_dir_all(&temp_dir);

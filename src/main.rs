@@ -155,9 +155,10 @@ enum Datatypes {
         #[arg(short, long)]
         twome: Option<String>,
 
-        /// dryrun - validate and log import tasks without writing
+
+        /// force overwrite of exising twome archive
         #[arg(short, long, action=ArgAction::SetTrue)]
-        dryrun: bool,
+        force: bool,
     }
 }
 
@@ -274,7 +275,7 @@ async fn main() {
                     }
                 },
 
-                Some(Datatypes::Import { twome, dryrun: _}) => {
+                Some(Datatypes::Import { twome, force}) => {
 
                     if twome.is_none() {
                         eprintln!("EPI2ME twome import requires a --twome <file> target to read");
@@ -291,7 +292,7 @@ async fn main() {
                                 return;
                             } if honest.is_some() {
                                 println!("importing something");
-                                import_resolved_content(&honest.unwrap());
+                                import_resolved_content(&honest.unwrap(), force);
                             }
 
                             
