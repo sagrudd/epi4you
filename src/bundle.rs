@@ -54,7 +54,7 @@ pub fn sha256_str_digest(payload_str: &str) -> String {
 }
 
 
-fn anyvalue_to_str(value: Option<&AnyValue>) -> String {
+pub fn anyvalue_to_str(value: Option<&AnyValue>) -> String {
     if value.is_some() {
         let vstr = value.unwrap().to_string();
         if vstr.starts_with("\"") && vstr.ends_with("\"") {

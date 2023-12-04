@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use app_db::dbmanager;
 use clap::{Parser, Subcommand, ArgAction};
-use dataframe::print_polars_df;
 use docker::docker_agent;
 use epi2me_db::epi2me_manager;
 use manifest::load_manifest_from_tarball;
@@ -20,7 +19,6 @@ mod epi2me_tar;
 mod docker;
 mod dataframe;
 
-use std::env;
 
 use crate::manifest::{is_manifest_honest, import_resolved_content};
 
@@ -187,33 +185,7 @@ async fn main() {
                 },
 
                 Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid }) => {
-
-                    let mut nxf_workdir = nxf_work.clone();
-                    if nxf_workdir.is_none() {
-                        nxf_workdir = Some(env::current_dir().unwrap().to_string_lossy().into_owned());
-                        println!("Setting nextflow workdir to cwd [{:?}]", nxf_workdir.clone().unwrap());
-                    }
-
-                    let localruns = nextflow::parse_nextflow_folder(nxf_workdir.clone(), nxf_bin.clone());
-                    if localruns.is_none() {
-                        println!("No local nextflow run folders found at specified path");
-                        return;
-                    }
-
-                    if *list {
-                        print_polars_df(&localruns.unwrap());
-                        // todo - how do we print out dataframe with a more considered number of columns?
-                    } else {
-                        if runid.is_none() {
-                            println!("EPI2ME analysis twome archiving requires a --runid identifier (run_name)");
-                            return;
-                        } else {
-                            if !nextflow::validate_db_entry(runid.as_ref().unwrap().to_string(), localruns.as_ref().unwrap()) {
-                                println!("Unable to resolve specified EPI2ME analysis [{}] - check name", runid.as_ref().unwrap());
-                                return;
-                            }
-                        }
-                    }
+                    nextflow::nextflow_manager(list, nxf_bin, nxf_work, runid);
                 },
 
                 Some(Datatypes::EPI2ME { list, bundlewf, runid, twome, force }) => {
@@ -246,33 +218,6 @@ async fn main() {
                             eprintln!("This archive may be malformed - cannot continue");
                         }
                     }
-
-                    
-
-
-                    // validate that the twome file is signed and contains a manifest
-
-                    // create temporary (auto delete) folder to unpack twome archive into
-
-                    // for each of the workflows provided within the twome archive
-
-                        // is the archive trusted
-
-                        // does the corresponding workflow already exist on the system
-
-                            // if it does is it an ==offline== existing installation that is older than the twome
-
-                            // has force been specified
-
-                        // deploy package 
-
-                        // are there linked docker containers?
-
-                            // is docker reachable through API calls?
-
-                    // cleanup any residual temp folder content
-
-
                     
 
                 },
