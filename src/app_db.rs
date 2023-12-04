@@ -10,6 +10,7 @@ use crate::dataframe::analysis_vec_to_df;
 use crate::dataframe::filter_df_by_value;
 use crate::dataframe::get_zero_val;
 use crate::manifest::Epi2meDesktopAnalysis;
+use crate::workflow::Workflow;
 use crate::{workflow, epi2me_db};
 
 
@@ -81,7 +82,7 @@ pub fn get_qualified_analysis_path(runid: &String, polardb: &DataFrame) -> PathB
 
 
 
-pub fn validate_qualified_analysis_workflow(runid: &String, polardb: &DataFrame, epi2wf_dir: &PathBuf) -> (Option<PathBuf>, Option<String>, Option<String>, Option<String>) {
+pub fn validate_qualified_analysis_workflow(runid: &String, polardb: &DataFrame, epi2wf_dir: &PathBuf) -> Option<Workflow> {
     
     let stacked = get_db_id_entry(runid, polardb).unwrap();
     let wf_proj = get_zero_val(&stacked, &String::from("workflowUser"));
@@ -98,10 +99,11 @@ pub fn validate_qualified_analysis_workflow(runid: &String, polardb: &DataFrame,
     // let's check that the path exists ...
     let wfdir_exists = workflow::check_defined_wfdir_exists(epi2wf_dir, &wf_proj, &wf_repo);
     if wfdir_exists.is_some() {
-        return (wfdir_exists, Some(wf_proj), Some(wf_repo), Some(wf_vers));
+        let wf = Workflow{project: wf_proj, name: wf_repo, version: wf_vers};
+        return Some(wf);
     }
 
-    return (None, None, None, None);
+    return None;
 }
 
 

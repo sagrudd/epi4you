@@ -173,12 +173,21 @@ pub fn get_manifest(_source: &PathBuf) -> Option<Epi2MeManifest> {
 }
 
 pub fn touch_manifest(man: &mut Epi2MeManifest) {
-
     let touch_prov = append_provenance(String::from("manifest_touched"), None, None, String::from(""));
     man.provenance.push(touch_prov);
-
 }
 
+pub fn manifest_note_packaged_analysis(man: &mut Epi2MeManifest, id: &String) {
+    let action = vec![String::from("analysis_bundled"), String::from(id)].join(": ");
+    let pack = append_provenance(action, None, None, String::from(""));
+    man.provenance.push(pack);
+}
+
+pub fn manifest_note_packaged_workflow(man: &mut Epi2MeManifest, id: &String) {
+    let action = vec![String::from("workflow_bundled"), String::from(id)].join(": ");
+    let pack = append_provenance(action, None, None, String::from(""));
+    man.provenance.push(pack);
+}
 
 pub fn file_manifest_size(files: &Vec<FileManifest>) -> u64 {
     let mut size: u64 = 0;

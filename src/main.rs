@@ -137,8 +137,8 @@ enum Datatypes {
         bundlewf: bool,
 
         /// Export EPI2ME Desktop analysis by ID
-        #[arg(short, long)]
-        runid: Option<String>,
+        #[arg(num_args(0..), short, long)]
+        runid: Vec<String>,
 
         /// target twome archive file
         #[arg(short, long)]

@@ -4,7 +4,7 @@ use home;
 use path_clean::PathClean;
 use polars_core::frame::DataFrame;
 use ulid::Ulid;
-use crate::{json, workflow, app_db, bundle};
+use crate::{json, workflow::{self, Workflow}, app_db, bundle};
 
 
 pub struct Epi2meSetup {
@@ -81,6 +81,7 @@ pub fn get_tempdir() -> Option<PathBuf> {
             return Some(epi4you);
         }
     }
+    eprintln!("unable to create temporary directory ...");
     return None;
 }
 
@@ -133,75 +134,85 @@ fn get_appdb_path(app_db_path: &PathBuf) -> Option<PathBuf> {
     return None;
 }
 
-pub fn epi2me_manager(epi2me: &Epi2meSetup, df: &DataFrame, list: &bool, runid: &Option<String>, twome: &Option<String>, force: &bool, bundlewf: &bool) {
+pub fn epi2me_manager(epi2me: &Epi2meSetup, df: &DataFrame, list: &bool, runids: &Vec<String>, twome: &Option<String>, force: &bool, bundlewf: &bool) {
     println!("epi2me.list == {}",*list);
     if *list {
         app_db::print_appdb(&df);
-    } else {
-        if runid.is_none() {
-            println!("EPI2ME analysis twome archiving requires a --runid identifier (name or id)");
+        return;
+    } 
+    if runids.len() == 0 {
+        println!("EPI2ME analysis twome archiving requires a --runid identifier (name or id)");
+        return;
+    } 
+    if twome.is_none() {
+        println!("EPI2ME twome archiving requires a --twome <file> target to writing to");
+        return; 
+    } 
+    let pb = PathBuf::from(twome.as_ref().unwrap());
+    if pb.exists() {
+        if pb.is_file() && !force {
+            println!("twome file specified already exists - either --force or use different name");
             return;
-        } else {
-            if !app_db::validate_db_entry(&runid.as_ref().unwrap().to_string(), &df) {
-                return;
-            }
+        } else if pb.is_dir() {
+            println!("twome file is a directory - file is required");
+            return;
+        } 
+    }  
+    // let's iterate through the provided runids
+    for runid in runids {
+        if !app_db::validate_db_entry(&runid, &df) {
+            return;
         }
+    }
 
-        let runid_str = &runid.as_ref().unwrap().to_string();
+    let mut bundle_wfs: Vec<Workflow> = Vec::new();
+
+    // if we're here the runids supplied are coherent
+    for runid_str in runids {
         let polardb = df.clone();
-
-        if twome.is_none() {
-            println!("EPI2ME twome archiving requires a --twome <file> target to writing to");
-            return; 
-        } else {
-            let pb = PathBuf::from(twome.as_ref().unwrap());
-            if pb.exists() {
-                if pb.is_file() && !force {
-                    println!("twome file specified already exists - either --force or use different name");
-                    return;
-                } else if pb.is_dir() {
-                    println!("twome file is a directory - file is required");
-                    return;
-                } 
-            }    
-        }
-
-        let mut bundle_workflow: Option<PathBuf> = None;
-        let mut wf_proj: Option<String> = None;
-        let mut wf_name: Option<String> = None;
-        let mut wf_vers: Option<String> = None;
 
         if bundlewf == &true {
             // ensure that a workflow for bundling is intact ...
-            let (xbundle_workflow, xwf_proj, xwf_name, xwf_vers) = app_db::validate_qualified_analysis_workflow(
+            let wf = app_db::validate_qualified_analysis_workflow(
                 &runid_str.to_string(), 
                 &polardb, &epi2me.epi2path,
             );
-            if xbundle_workflow.is_none() {
+            if wf.is_none() {
                 eprintln!("This workflow may be an orphan - cannot continue");
                 return;
-            } else {
-                bundle_workflow = xbundle_workflow; 
-                wf_proj = xwf_proj;
-                wf_name = xwf_name;
-                wf_vers = xwf_vers;
-                println!("workflow instance found at [{:?}]", bundle_workflow);
+            } 
+
+            // do we need to add this wf to the vector of wfs?
+            let wwf = wf.unwrap();
+            let mut add_it = true;
+            for xwf in &bundle_wfs {
+                if xwf.project == wwf.project && xwf.name == wwf.name {
+                    add_it = false;
+                }
+            }
+            if add_it {
+                println!("workflow instance found at [{:?}]", &wwf);
+                bundle_wfs.push(wwf);
             }
         }
 
-        // if we are here we have a destination and a unique runid - let's sanity check the destination PATH
-        // there is some broken logic as described in https://github.com/sagrudd/epi4you/issues/1
-        let path = Path::new(twome.as_ref().unwrap());
-        let mut absolute_path;
-        if path.is_absolute() {
-            absolute_path = path.to_path_buf();
-        } else {
-            absolute_path = env::current_dir().unwrap().join(path);
-        }
-        absolute_path = absolute_path.clean();
-        println!("tar .2me archive to be written to [{:?}]", absolute_path);
-
-        // we have a destination and a unique runid - let's package something ...
-        bundle::export_desktop_run(&runid_str, &polardb, Some(absolute_path), bundle_workflow, wf_proj, wf_name, wf_vers);
     }
+
+    // if we are here we have a destination and a unique runid - let's sanity check the destination PATH
+    // there is some broken logic as described in https://github.com/sagrudd/epi4you/issues/1
+    let path = Path::new(twome.as_ref().unwrap());
+    let mut absolute_path;
+    if path.is_absolute() {
+        absolute_path = path.to_path_buf();
+    } else {
+        absolute_path = env::current_dir().unwrap().join(path);
+    }
+    absolute_path = absolute_path.clean();
+    println!("tar .2me archive to be written to [{:?}]", absolute_path);
+
+    // we have a destination and a unique runid - let's package something ...
+    
+    bundle::export_desktop_run(runids, df, Some(absolute_path), &bundle_wfs);
+
+    
 }
