@@ -442,7 +442,7 @@ fn clone_extant_database_entry(runid_str: &String, epi2me_instances: &DataFrame,
     if epi2meitem.is_some() {
         let e2eitem = epi2meitem.unwrap();
         let mut src_dir = epi2me_db::find_db().unwrap().instances_path;
-        src_dir.push(vec![String::from(&e2eitem.workflowRepo) ,String::from(&e2eitem.id)].join("_"));
+        src_dir.push(vec![String::from(&e2eitem.workflowRepo), String::from(&e2eitem.id)].join("_"));
 
         let epi2meitem_x = epi2me_item_rebrand(&e2eitem, clone);
         println!("new epi2meobj = {:?}", &epi2meitem_x);

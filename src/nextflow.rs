@@ -5,6 +5,7 @@ use polars_core::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use ulid::Ulid;
+use walkdir::WalkDir;
 use std::io::Cursor;
 use std::path::PathBuf;
 use glob::glob;
@@ -535,6 +536,17 @@ pub fn bundle_cli_run(temp_dir: &TempDir, wf_analysis: NxfLogItem, src_dir: &Pat
         return;
     }
 
+    //let paths = fs::read_dir(analysis_path.unwrap()).unwrap();
+    //for path in paths {
+    //    let xpath = path.unwrap().path().clone();
+    //    println!("handling xpath {:?}", xpath);
+    //}
+
+    for entry in WalkDir::new(&analysis_path.unwrap()) {
+        if entry.is_ok() {
+            println!("{:?}", entry.unwrap());
+        }
+    }
 
     /*
     Once we are here, can we re-use any of the earlier logic to just bundle the now mangled workflow as used
