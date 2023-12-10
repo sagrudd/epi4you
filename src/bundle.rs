@@ -10,9 +10,10 @@ use stringreader::StringReader;
 use std::fs::{File, remove_dir_all};
 use std::io::{BufReader, Read};
 
-use crate::epi2me_db::{self, get_tempdir};
+use crate::epi2me_db::{self};
 use crate::json::{get_manifest_str, write_manifest_str};
-use crate::manifest::{MANIFEST_JSON, Epi2MeManifest, touch_manifest, Epi2meWorkflow, file_manifest_size, manifest_note_packaged_analysis, manifest_note_packaged_workflow};
+use crate::manifest::{MANIFEST_JSON, Epi2meWorkflow, file_manifest_size, manifest_note_packaged_analysis, manifest_note_packaged_workflow};
+use crate::tempdir;
 use crate::workflow::{self, check_defined_wfdir_exists, Workflow};
 use crate::{manifest::{get_manifest, Epi2MeContent, FileManifest}, app_db, epi2me_tar};
 
@@ -91,13 +92,12 @@ pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>, force: &bo
     let local_prefix = epi2me_db::find_db().unwrap().epi2path;
 
     // create a temporary path for this export exploration
-    let tempdir = get_tempdir();
+    let tempdir = tempdir::get_tempdir();
     if tempdir.is_none() {
         return;
     }
     let temp_dir = tempdir.unwrap();
-    println!("using tempdir at [{:?}]", &temp_dir);
-    let mut manifest = get_manifest(&temp_dir).unwrap();
+    let mut manifest = get_manifest(&temp_dir.path).unwrap();
     let mut all_files: Vec<FileManifest> = Vec::new();
 
     for idx in 0..source.height() {
@@ -131,7 +131,7 @@ pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>, force: &bo
     manifest.signature = manifest_signature;
 
     // add the file manifest to the manifest
-    let mut manifest_pb = temp_dir.clone();
+    let mut manifest_pb = PathBuf::from(&temp_dir.path);
     manifest_pb.push(MANIFEST_JSON);
     write_manifest_str(&manifest, &manifest_pb);
 
@@ -151,7 +151,7 @@ pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>, force: &bo
     }
 
     // cleanup temporary content ...
-    let sanitise = remove_dir_all(&temp_dir);
+    let sanitise = remove_dir_all(&temp_dir.path);
     if sanitise.is_err() {
         eprintln!("failed to cleanup working directory");
     }
@@ -200,6 +200,12 @@ fn fish_files(source: &PathBuf, local_prefix: &PathBuf) -> Vec<FileManifest> {
 }
 
 
+pub fn export_cli_run(_destination: PathBuf) {
+
+}
+
+
+
 pub fn export_desktop_run(runids: &Vec<String>, polardb: &DataFrame, destination: Option<PathBuf>, bundlewfs: &Vec<Workflow>) {
     let local_prefix = epi2me_db::find_db().unwrap().epi2path;
     if destination.is_none() {
@@ -208,13 +214,13 @@ pub fn export_desktop_run(runids: &Vec<String>, polardb: &DataFrame, destination
     }
     let dest = destination.unwrap();
     // create a temporary path for this export exploration
-    let tempdir = get_tempdir();
+    let tempdir = tempdir::get_tempdir();
     if tempdir.is_none() {
         return;
     }
     let temp_dir = tempdir.unwrap();
-    println!("using tempdir at [{:?}]", &temp_dir);
-    let mut manifest = get_manifest(&temp_dir).unwrap();
+    println!("using tempdir at [{}]", &temp_dir);
+    let mut manifest = get_manifest(&temp_dir.path).unwrap();
     let mut all_files: Vec<FileManifest> = Vec::new();
 
     for runid in runids {
@@ -270,23 +276,12 @@ pub fn export_desktop_run(runids: &Vec<String>, polardb: &DataFrame, destination
     let manifest_signature = sha256_str_digest(get_manifest_str(&manifest).as_str());
     manifest.signature = manifest_signature;
     
-    let mut manifest_pb = temp_dir.clone();
+    let mut manifest_pb = PathBuf::from(&temp_dir.path);
     manifest_pb.push(MANIFEST_JSON);
     write_manifest_str(&manifest, &manifest_pb);
 
     // tar up the contents specified in the manifest
     epi2me_tar::tar(dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
-}
-
-
-
-
-fn is_nascent_manifest(manifest: &Epi2MeManifest) -> bool {
-    // if the manifest has a non-default checksum then it is unlikely to be new
-    if manifest.signature == String::from("undefined") {
-        return true;
-    }
-    return false;
 }
 
 

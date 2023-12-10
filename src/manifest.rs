@@ -172,7 +172,7 @@ pub fn get_manifest(_source: &PathBuf) -> Option<Epi2MeManifest> {
 
 }
 
-pub fn touch_manifest(man: &mut Epi2MeManifest) {
+pub fn _touch_manifest(man: &mut Epi2MeManifest) {
     let touch_prov = append_provenance(String::from("manifest_touched"), None, None, String::from(""));
     man.provenance.push(touch_prov);
 }

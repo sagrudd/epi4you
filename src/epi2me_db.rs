@@ -1,9 +1,8 @@
-use std::{path::{PathBuf, Path}, fs::{self, create_dir_all}, env};
+use std::{path::{PathBuf, Path}, fs::{self}, env};
 
 use home;
 use path_clean::PathClean;
 use polars_core::frame::DataFrame;
-use ulid::Ulid;
 use crate::{json, workflow::{self, Workflow}, app_db, bundle};
 
 
@@ -69,21 +68,6 @@ pub fn find_db() -> Option<Epi2meSetup> {
     return None;
 }
 
-
-pub fn get_tempdir() -> Option<PathBuf> {
-    let x = find_db();
-    if x.is_some() {
-        let mut epi4you = x.unwrap().epi4you_path;
-        let ulid_str = Ulid::new().to_string();
-        epi4you.push(ulid_str);
-        let status = create_dir_all(&epi4you);
-        if status.is_ok() {
-            return Some(epi4you);
-        }
-    }
-    eprintln!("unable to create temporary directory ...");
-    return None;
-}
 
 
 fn get_4you_path(app_db_path: &PathBuf) -> Option<PathBuf> {

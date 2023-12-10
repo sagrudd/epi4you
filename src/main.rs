@@ -18,6 +18,7 @@ mod workflow;
 mod epi2me_tar;
 mod docker;
 mod dataframe;
+mod tempdir;
 
 
 use crate::manifest::{is_manifest_honest, import_resolved_content};
@@ -122,6 +123,10 @@ enum Datatypes {
         /// Export EPI2ME analysis by nun_name
         #[arg(short, long)]
         runid: Option<String>,
+
+        /// target twome archive file
+        #[arg(short, long)]
+        twome: Option<String>,
     },
 
     /// EPI2ME workflow results
@@ -184,8 +189,8 @@ async fn main() {
                     workflow_manager(list, workflow, twome, force);
                 },
 
-                Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid }) => {
-                    nextflow::nextflow_manager(list, nxf_bin, nxf_work, runid);
+                Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid, twome }) => {
+                    nextflow::nextflow_manager(list, nxf_bin, nxf_work, runid, twome);
                 },
 
                 Some(Datatypes::EPI2ME { list, bundlewf, runid, twome, force }) => {
