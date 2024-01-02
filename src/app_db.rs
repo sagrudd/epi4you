@@ -4,6 +4,8 @@ use rusqlite::{Connection, Result};
 use polars::prelude::*;
 use polars::df;
 use ulid::Ulid;
+use url::Position;
+use url::{Url, ParseError};
 use std::{env, fs};
 use std::path::PathBuf;
 use crate::dataframe::analysis_vec_to_df;
@@ -162,6 +164,74 @@ fn get_instance_struct_from_desktop_analysis(danalysis: &Epi2meDesktopAnalysis) 
     };
     return Some(x);
 } 
+
+
+pub fn get_analysis_struct_from_cli(source: &PathBuf, nextflow_stdout: &String) -> Option<Epi2meDesktopAnalysis>  {
+
+    let mut log = PathBuf::from(source);
+    log.push("nextflow.stdout");
+
+    // println!("{}", nextflow_stdout);
+
+    let mut name = "";
+    let mut revision = "";
+    let revision_key = " - revision: ";
+    let mut url_str = "";
+    let url_str_key = "Launching `";
+    let mut project = String::from("");
+    let mut pname = String::from("");
+    let mut version = String::from("");
+    let xxxkey = "||||||||||";
+
+    let lines = nextflow_stdout.split("\n");
+    for line in lines {
+        if line.starts_with(url_str_key) {
+            println!("{line}");
+
+            name = &line[line.find("[").unwrap()+1..line.find("]").unwrap()];
+            revision = &line[line.find(revision_key).unwrap()+revision_key.len()..];
+            revision = &revision[..revision.find(" ").unwrap()];
+            url_str = &line[line.find(url_str_key).unwrap()+url_str_key.len()..];
+            url_str = &url_str[..url_str.find("`").unwrap()];
+
+            let url = Url::parse(url_str);
+            if url.is_ok() {
+                let data_url_payload = &url.unwrap()[Position::AfterHost..][1..];
+                println!("{:?}", &data_url_payload);
+
+                let x = &data_url_payload.split_once('/');
+                if x.is_some() {
+                    let (aproject, apname) = x.clone().unwrap();
+                    project = String::from(aproject);
+                    pname = String::from(apname);
+                }
+            }
+        } else if line.contains(xxxkey) && line.contains(&pname) {
+            println!("extracting vers from [{}]", line);
+            let v = line[line.find(&pname).unwrap()+pname.len()..].trim();
+            version = String::from(&v[.. v.find("-").unwrap()]);
+            //println!("{v}");
+        }
+    }
+
+    let x = Epi2MeAnalysis { 
+        id: String::from(source.file_name().unwrap().to_str().unwrap()),
+        path: String::from(source.to_str().unwrap()),
+        name: String::from(name),
+        status: String::from("COMPLETED"),
+        workflowRepo: pname,
+        workflowUser: project,
+        workflowCommit: String::from(revision),
+        workflowVersion: version,
+        createdAt: String::from(""),
+        updatedAt: String::from(""),
+    };
+
+    println!("{:?}", x);
+
+    return None;
+}
+
 
 
 pub fn get_analysis_struct(runid: &String, polardb: &DataFrame) -> Option<Epi2meDesktopAnalysis> {

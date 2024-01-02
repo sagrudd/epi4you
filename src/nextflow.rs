@@ -497,7 +497,7 @@ pub fn bundle_cli_run(temp_dir: &TempDir, wf_analysis: NxfLogItem, src_dir: &Pat
     // progress.json
     /* this is the summary of tasks that have been run (through the GUI) and the final state and count of completed
     tasks - this is eye candy from the application side; information should be entirely parseable from the nextflow.log */
-    let progress_json = prepare_progress_json(&nextflow_stdout.unwrap(), &temp_dir.path, &ulid_str);
+    let progress_json = prepare_progress_json(&nextflow_stdout.clone().unwrap(), &temp_dir.path, &ulid_str);
     if progress_json.is_none() {
         eprintln!("issue with packaging the workflow progress json");
         return;
@@ -542,9 +542,28 @@ pub fn bundle_cli_run(temp_dir: &TempDir, wf_analysis: NxfLogItem, src_dir: &Pat
     //    println!("handling xpath {:?}", xpath);
     //}
 
+    println!("TempDir == {}", temp_dir);
+    println!("AnalysisPath == {:?}", &analysis_path.clone().unwrap());
+    let mut local_output = temp_dir.path.clone();
+    local_output.push("output");
+    let _create_d = fs::create_dir(&local_output);
+    let ap = &analysis_path.clone().unwrap();
     for entry in WalkDir::new(&analysis_path.unwrap()) {
         if entry.is_ok() {
-            println!("{:?}", entry.unwrap());
+            let ent = entry.unwrap();
+            let core_p = ent.path().strip_prefix(ap);
+            if core_p.is_ok() {
+                let gg = core_p.unwrap();
+                let mut dest_f = local_output.clone();
+                dest_f.push(&gg);
+                println!("src {:?} -> ", &dest_f);
+
+                if gg.is_dir() {
+                    let _create_d = fs::create_dir_all(dest_f);
+                } else if gg.is_file() {
+                    let _copy_f = fs::copy(ent.path(), dest_f);
+                }
+            }
         }
     }
 
@@ -557,7 +576,7 @@ pub fn bundle_cli_run(temp_dir: &TempDir, wf_analysis: NxfLogItem, src_dir: &Pat
         eprintln!("twome destination [{:?}] already exists - use `--force`?", dest);
         return;
     }
-    bundle::export_cli_run(dest);
+    bundle::export_cli_run(temp_dir.path.clone(), temp_dir.clone(), dest, &nextflow_stdout.clone().unwrap());
 
 }
 

@@ -13,7 +13,7 @@ use std::io::{BufReader, Read};
 use crate::epi2me_db::{self};
 use crate::json::{get_manifest_str, write_manifest_str};
 use crate::manifest::{MANIFEST_JSON, Epi2meWorkflow, file_manifest_size, manifest_note_packaged_analysis, manifest_note_packaged_workflow};
-use crate::tempdir;
+use crate::tempdir::{self, TempDir};
 use crate::workflow::{self, check_defined_wfdir_exists, Workflow};
 use crate::{manifest::{get_manifest, Epi2MeContent, FileManifest}, app_db, epi2me_tar};
 
@@ -200,8 +200,19 @@ fn fish_files(source: &PathBuf, local_prefix: &PathBuf) -> Vec<FileManifest> {
 }
 
 
-pub fn export_cli_run(_destination: PathBuf) {
+pub fn export_cli_run(source: PathBuf, temp_dir: TempDir, dest: PathBuf, nextflow_stdout: &String) {
 
+    let mut manifest = get_manifest(&temp_dir.path).unwrap();
+    let mut all_files: Vec<FileManifest> = Vec::new();
+
+    println!("packing [{:?}] into .2me format archive", &source.clone());
+    let zz = app_db::get_analysis_struct_from_cli(&source, nextflow_stdout);
+
+   //  std::process::exit(101);
+
+    if zz.is_some() {
+
+    }
 }
 
 

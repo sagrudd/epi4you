@@ -31,11 +31,14 @@ pub struct TempDir {
 impl Drop for TempDir {
     fn drop(&mut self) {
         let str = self.path.as_os_str().to_str().unwrap();
-        println!("Dropping TempDir with path `{}`!", str);
-        let cleanup = fs::remove_dir_all(&self.path);
-        if cleanup.is_err() {
-            eprintln!("failed to cleanup temporary directory at [{}]", str);
-        } 
+        // if has been cloned then may not exist -- test for this
+        if self.path.exists() {
+            println!("Dropping TempDir with path `{}`!", str);
+            let cleanup = fs::remove_dir_all(&self.path);
+            if cleanup.is_err() {
+                eprintln!("failed to cleanup temporary directory at [{}]", str);
+            } 
+        }
     }
 }
 
