@@ -1,5 +1,4 @@
 use std::{path::{PathBuf, Path}, fs::{self}, env};
-
 use home;
 use path_clean::PathClean;
 use polars_core::frame::DataFrame;
@@ -7,17 +6,12 @@ use crate::{json, workflow::{self, Workflow}, app_db, bundle};
 
 
 pub struct Epi2meSetup {
-    pub epi2os: String,
     pub epi2path: PathBuf,
     pub epi2db_path: PathBuf,
     pub epi2wf_dir: PathBuf,
     pub epi4you_path: PathBuf,
     pub instances_path: PathBuf,
     pub arch: String,
-}
-
-pub fn get_platformstr() -> String {
-    return String::from(std::env::consts::ARCH);
 }
 
 
@@ -27,18 +21,22 @@ pub fn find_db() -> Option<Epi2meSetup> {
     let home_dir = home::home_dir();
     if home_dir.is_some() {
 
-        let mut os: Option<String> = None;
         let mut path: Option<PathBuf> = None;
 
-        let macos = check_os_specific_db_path(&home_dir, "Library/Application Support/EPI2ME/config.json", "macOS");
-        let linux = check_os_specific_db_path(&home_dir, ".config/EPI2ME/config.json", "Linux");
+        /* There is a sequence through which the working directory should be sought - presence of a config file should be considered first
+        - if there is no config file the location of the default $HOME/epi2melabs should also be allowed?
+         */
+
+        let macos = check_os_specific_db_path(&home_dir, "Library/Application Support/EPI2ME/config.json");
+        let linux = check_os_specific_db_path(&home_dir, ".config/EPI2ME/config.json");
+        let default: Option<PathBuf> = check_os_specific_db_path(&home_dir, "epi2melabs");
         
         if macos.is_some() {
-            os = Some(String::from("macOS"));
             path = macos;
         } else if linux.is_some() {
-            os = Some(String::from("linux"));
             path = linux;
+        } else if default.is_some() {
+            path = default;
         }
 
         if path.is_some() {
@@ -51,20 +49,19 @@ pub fn find_db() -> Option<Epi2meSetup> {
             if db_path.is_some() && wf_dir.is_some() {
 
                 let vehicle = Epi2meSetup {
-                    epi2os: os.unwrap(),
                     epi2path: path.unwrap(),
                     epi2db_path: PathBuf::from(&db_path.unwrap()),
                     epi2wf_dir: wf_dir.unwrap(),
                     epi4you_path: for_you_dir.unwrap(),
-                    instances_path: instances_path,
-                    arch: get_platformstr(),
+                    instances_path,
+                    arch: String::from(std::env::consts::ARCH),
                 };
 
                 return Some(vehicle);
             }
         }
     }
-
+    eprintln!("Unable to locate the EPI2ME application database ...");
     return None;
 }
 
@@ -89,12 +86,15 @@ fn get_4you_path(app_db_path: &PathBuf) -> Option<PathBuf> {
 }
 
 
-fn check_os_specific_db_path(home: &Option<PathBuf>, os_specific_path: &str, os_label: &str) -> Option<PathBuf> {
+fn check_os_specific_db_path(home: &Option<PathBuf>, os_specific_path: &str) -> Option<PathBuf> {
     let mut pb = home.clone().unwrap();
     pb.push(os_specific_path);
-    if pb.exists() {
-        println!("\t{} installation [{}]", os_label, pb.display());
+    if pb.exists() && pb.is_file() {
+        println!("\tinstallation [{}]", pb.display());
         return extract_epi2me_path(&pb);
+    } else if pb.exists() && pb.is_dir() {
+        println!("\tinstallation [{}]", pb.display());
+        return Some(pb);
     }
     return None;
 }

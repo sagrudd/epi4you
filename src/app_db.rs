@@ -5,7 +5,7 @@ use polars::prelude::*;
 use polars::df;
 use ulid::Ulid;
 use url::Position;
-use url::{Url, ParseError};
+use url::Url;
 use std::{env, fs};
 use std::path::PathBuf;
 use crate::dataframe::analysis_vec_to_df;

@@ -1,5 +1,4 @@
 use std::{path::PathBuf, fs, collections::HashMap};
-use crate::epi2me_db::get_platformstr;
 use crate::{epi2me_db::Epi2meSetup, workflow::glob_path_by_wfname};
 use regex::Regex;
 use docker_api::{Docker, Result};
@@ -337,7 +336,7 @@ pub async fn docker_agent(epi2me: &Epi2meSetup, workflow_opt: &Option<String>, l
             eprintln!("export path [{export_path}] is a file; folder required");
             return;
         } else {
-            let arch = get_platformstr();
+            let arch = String::from(std::env::consts::ARCH);
             let version = nf_config.get("manifest.version").unwrap();
             let folder = vec![workflow, version.clone(), arch].join(".");
             println!("creating object = {folder}");
