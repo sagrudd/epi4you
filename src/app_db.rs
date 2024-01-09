@@ -166,7 +166,7 @@ fn get_instance_struct_from_desktop_analysis(danalysis: &Epi2meDesktopAnalysis) 
 } 
 
 
-pub fn get_analysis_struct_from_cli(source: &PathBuf, nextflow_stdout: &String) -> Option<Epi2meDesktopAnalysis>  {
+pub fn get_analysis_struct_from_cli(ulid_str: &String, source: &PathBuf, nextflow_stdout: &String, timestamp: &String) -> Option<Epi2meDesktopAnalysis>  {
 
     let mut log = PathBuf::from(source);
     log.push("nextflow.stdout");
@@ -176,7 +176,6 @@ pub fn get_analysis_struct_from_cli(source: &PathBuf, nextflow_stdout: &String) 
     let mut name = "";
     let mut revision = "";
     let revision_key = " - revision: ";
-    let mut url_str = "";
     let url_str_key = "Launching `";
     let mut project = String::from("");
     let mut pname = String::from("");
@@ -191,7 +190,7 @@ pub fn get_analysis_struct_from_cli(source: &PathBuf, nextflow_stdout: &String) 
             name = &line[line.find("[").unwrap()+1..line.find("]").unwrap()];
             revision = &line[line.find(revision_key).unwrap()+revision_key.len()..];
             revision = &revision[..revision.find(" ").unwrap()];
-            url_str = &line[line.find(url_str_key).unwrap()+url_str_key.len()..];
+            let mut url_str = &line[line.find(url_str_key).unwrap()+url_str_key.len()..];
             url_str = &url_str[..url_str.find("`").unwrap()];
 
             let url = Url::parse(url_str);
@@ -214,8 +213,8 @@ pub fn get_analysis_struct_from_cli(source: &PathBuf, nextflow_stdout: &String) 
         }
     }
 
-    let x = Epi2MeAnalysis { 
-        id: String::from(source.file_name().unwrap().to_str().unwrap()),
+    let x = Epi2meDesktopAnalysis { 
+        id: String::from(ulid_str),
         path: String::from(source.to_str().unwrap()),
         name: String::from(name),
         status: String::from("COMPLETED"),
@@ -223,13 +222,13 @@ pub fn get_analysis_struct_from_cli(source: &PathBuf, nextflow_stdout: &String) 
         workflowUser: project,
         workflowCommit: String::from(revision),
         workflowVersion: version,
-        createdAt: String::from(""),
-        updatedAt: String::from(""),
+        createdAt: String::from(timestamp),
+        updatedAt: String::from(timestamp),
+        ..Default::default()
     };
 
     println!("{:?}", x);
-
-    return None;
+    return Some(x);
 }
 
 
@@ -562,13 +561,22 @@ pub fn insert_untarred_desktop_analysis(desktop_analysis: &Epi2meDesktopAnalysis
             let file_to_check = PathBuf::from(&src_dir).join(&file.relative_path).join(PathBuf::from(&file.filename));
             
             let mut rp = PathBuf::from(&file.relative_path);
-            if rp.starts_with("instances") {
-                rp = PathBuf::from(rp.strip_prefix("instances").unwrap());
-                let exp_dir = vec![String::from(&e2eitem.workflowRepo) ,String::from(&e2eitem.id)].join("_");
-                if rp.starts_with(&exp_dir) {
-                    rp = PathBuf::from(rp.strip_prefix(exp_dir).unwrap());
+            if rp.starts_with("instances") || rp.starts_with("import_export_4you") {
+                if rp.starts_with("instances") {
+                    rp = PathBuf::from(rp.strip_prefix("instances").unwrap());
+                    let exp_dir = vec![String::from(&e2eitem.workflowRepo), String::from(&e2eitem.id)].join("_");
+                    if rp.starts_with(&exp_dir) {
+                        rp = PathBuf::from(rp.strip_prefix(exp_dir).unwrap());
+                    }
+                } else if rp.starts_with("import_export_4you") {
+                    rp = PathBuf::from(rp.strip_prefix("import_export_4you").unwrap());
+                    // there is a presumption here that the first path element is just a ulid string from packaging cli nextflow run
+                    // -- just clip it  
+                    let mut components = rp.components();
+                    let c = components.next().unwrap().as_os_str().to_str().unwrap();
+                    rp = PathBuf::from(rp.strip_prefix(c).unwrap());
                 }
-            }
+            } 
 
             let dest_file = PathBuf::from(&epi2meitem_x.path).join(&rp).join(PathBuf::from(&file.filename));
 

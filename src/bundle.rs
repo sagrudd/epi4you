@@ -200,19 +200,51 @@ fn fish_files(source: &PathBuf, local_prefix: &PathBuf) -> Vec<FileManifest> {
 }
 
 
-pub fn export_cli_run(source: PathBuf, temp_dir: TempDir, dest: PathBuf, nextflow_stdout: &String) {
-
+pub fn export_cli_run(ulidstr: &String, source: PathBuf, temp_dir: TempDir, dest: PathBuf, nextflow_stdout: &String, timestamp: &String) {
+    let local_prefix = epi2me_db::find_db().unwrap().epi2path;
     let mut manifest = get_manifest(&temp_dir.path).unwrap();
     let mut all_files: Vec<FileManifest> = Vec::new();
 
     println!("packing [{:?}] into .2me format archive", &source.clone());
-    let zz = app_db::get_analysis_struct_from_cli(&source, nextflow_stdout);
-
-   //  std::process::exit(101);
+    let zz = app_db::get_analysis_struct_from_cli(ulidstr, &source, nextflow_stdout, timestamp);
 
     if zz.is_some() {
+        let mut vehicle = zz.unwrap();
 
+        manifest_note_packaged_analysis(&mut manifest, 
+            &vec![String::from(&vehicle.workflowUser), 
+                String::from(&vehicle.workflowRepo), String::from(&vehicle.name)].join("/"));
+
+        // as per https://github.com/sagrudd/epi4you/issues/1 - ensure that destination is not in source
+        let common_prefix = &dest.strip_prefix(&source);
+        if !common_prefix.is_err() {
+            eprintln!("Destination is a child of source - this will not work!");
+            return;
+        }
+
+        
+        vehicle.files = fish_files(&source, &local_prefix);
+       
+        all_files.extend(vehicle.files.clone());
+        manifest.filecount += u64::try_from(vehicle.files.len()).unwrap();
+        manifest.files_size += file_manifest_size(&vehicle.files);
+        manifest.payload.push( Epi2MeContent::Epi2mePayload(vehicle.clone()) );    
+
+
+        println!("{:?}", &manifest);
     }
+    
+
+    let manifest_signature = sha256_str_digest(get_manifest_str(&manifest).as_str());
+    manifest.signature = manifest_signature;
+    
+    let mut manifest_pb = PathBuf::from(&temp_dir.path);
+    manifest_pb.push(MANIFEST_JSON);
+    write_manifest_str(&manifest, &manifest_pb);
+
+    // tar up the contents specified in the manifest
+    epi2me_tar::tar(dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
+
 }
 
 

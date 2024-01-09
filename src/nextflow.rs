@@ -577,7 +577,7 @@ pub fn bundle_cli_run(temp_dir: &TempDir, wf_analysis: NxfLogItem, src_dir: &Pat
         eprintln!("twome destination [{:?}] already exists - use `--force`?", dest);
         return;
     }
-    bundle::export_cli_run(temp_dir.path.clone(), temp_dir.clone(), dest, &nextflow_stdout.clone().unwrap(), &wf_analysis.timestamp);
+    bundle::export_cli_run(&ulid_str, temp_dir.path.clone(), temp_dir.clone(), dest, &nextflow_stdout.clone().unwrap(), &wf_analysis.timestamp);
 
 }
 
