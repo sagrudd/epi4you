@@ -255,7 +255,7 @@ fn get_matched_nexflow_log(logfile: &PathBuf, runid: &String) -> Option<String> 
 }
 
 
-fn locate_nextflow_log(src_dir: &PathBuf, wf_analysis: NxfLogItem, tmp_dir: &PathBuf) -> Option<String> {
+fn locate_nextflow_log(src_dir: &PathBuf, wf_analysis: &NxfLogItem, tmp_dir: &PathBuf) -> Option<String> {
     println!("locating nextflow logs ...");
 
 
@@ -481,7 +481,7 @@ pub fn bundle_cli_run(temp_dir: &TempDir, wf_analysis: NxfLogItem, src_dir: &Pat
 
      they may be matched on the basis of the provided run_name - this should be unique - esp. in combination with
      the command line used */
-    let nextflow_log = locate_nextflow_log(src_dir, wf_analysis, &temp_dir.path);
+    let nextflow_log = locate_nextflow_log(src_dir, &wf_analysis, &temp_dir.path);
     if nextflow_log.is_none() {
         return;
     }
@@ -558,9 +558,10 @@ pub fn bundle_cli_run(temp_dir: &TempDir, wf_analysis: NxfLogItem, src_dir: &Pat
                 dest_f.push(&gg);
                 println!("src {:?} -> ", &dest_f);
 
-                if gg.is_dir() {
+                if ent.path().is_dir() {
                     let _create_d = fs::create_dir_all(dest_f);
-                } else if gg.is_file() {
+                } else if ent.path().is_file() {
+                    println!("copying ...");
                     let _copy_f = fs::copy(ent.path(), dest_f);
                 }
             }
@@ -576,7 +577,7 @@ pub fn bundle_cli_run(temp_dir: &TempDir, wf_analysis: NxfLogItem, src_dir: &Pat
         eprintln!("twome destination [{:?}] already exists - use `--force`?", dest);
         return;
     }
-    bundle::export_cli_run(temp_dir.path.clone(), temp_dir.clone(), dest, &nextflow_stdout.clone().unwrap());
+    bundle::export_cli_run(temp_dir.path.clone(), temp_dir.clone(), dest, &nextflow_stdout.clone().unwrap(), &wf_analysis.timestamp);
 
 }
 
