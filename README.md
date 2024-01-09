@@ -177,3 +177,17 @@ Looking for nxf artifacts at [/data/CAACB_presentation/nextflow/]
 │ 2023-10-06 20:42:29 ┆ 1h 7m 39s  ┆ berserk_sanger            ┆ OK     ┆ 9d640fe641  ┆ ec0c6f3d-acc1-4eb0-839e-5f25c7ab… ┆ nextflow run epi2me-labs/wf-meta… │
 └─────────────────────┴────────────┴───────────────────────────┴────────┴─────────────┴───────────────────────────────────┴───────────────────────────────────┘
 ```
+
+### Export a local CLI nextflow run as a portable tarball
+
+The `epi4you` package can bundle a CLI prepared analysis for distribution (and import).
+
+```
+epi4you nextflow \
+    --nxf-work /data/nextflow_runs/ \
+    --runid golden_torvalds \
+    --twome /data/wf-basecalling-cDNA.tar
+```
+
+This will identify the run with the name `golden_torvalds` from the specified work directory and will write data and manifest to the file
+specified by the `--twome` parameter. This bundle can then be imported with the canonical `epi4you import` functionality.
