@@ -169,20 +169,31 @@ enum Datatypes {
 async fn main() {
     let cliargs = Args::parse();
 
-    let epi2me_opt = epi2me_db::find_db();
-    if epi2me_opt.is_some() {
-        let epi2me = epi2me_opt.unwrap();
-        let df = app_db::load_db(&epi2me.epi2db_path);
-        if df.is_ok() {
+    //let epi2me_opt = epi2me_db::find_db();
+    //if epi2me_opt.is_some() {
+    //    let epi2me = epi2me_opt.unwrap();
+    //    let df = app_db::load_db(&epi2me.epi2db_path);
+    //    if df.is_ok() {
 
             match &cliargs.command {
 
                 Some(Datatypes::Docker { workflow: project, list, pull, export }) => {
-                    docker_agent(&epi2me, project, list, pull, export).await;
+                    let epi2me_opt = epi2me_db::find_db();
+                    if epi2me_opt.is_some() {
+                        let epi2me = epi2me_opt.unwrap();
+                        docker_agent(&epi2me, project, list, pull, export).await;
+                    }
                 },
 
                 Some(Datatypes::Database { list, runid, status, delete, rename, housekeeping, clone }) => {
-                    dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename, housekeeping, clone);
+                    let epi2me_opt = epi2me_db::find_db();
+                    if epi2me_opt.is_some() {
+                        let epi2me = epi2me_opt.unwrap();
+                        let df = app_db::load_db(&epi2me.epi2db_path);
+                        if df.is_ok() {
+                            dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename, housekeeping, clone);
+                        }
+                    }
                 },
 
                 Some(Datatypes::Workflow { list, workflow, twome, force }) => {
@@ -194,7 +205,14 @@ async fn main() {
                 },
 
                 Some(Datatypes::EPI2ME { list, bundlewf, runid, twome, force }) => {
-                    epi2me_manager(&epi2me, &df.unwrap(), list, runid, twome, force, bundlewf);
+                    let epi2me_opt = epi2me_db::find_db();
+                    if epi2me_opt.is_some() {
+                        let epi2me = epi2me_opt.unwrap();
+                        let df = app_db::load_db(&epi2me.epi2db_path);
+                        if df.is_ok() {
+                            epi2me_manager(&epi2me, &df.unwrap(), list, runid, twome, force, bundlewf);
+                        }
+                    }
                 },
 
                 Some(Datatypes::Import { twome, force}) => {
@@ -257,10 +275,5 @@ async fn main() {
 
                 None => {}
             }
-        } else {
-            println!("db issue?");
-        }
-    }
-
     
 }

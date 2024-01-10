@@ -1,4 +1,4 @@
-use std::{path::PathBuf, fs::{create_dir_all, self}, fmt};
+use std::{path::PathBuf, fs::{create_dir_all, self}, fmt, env};
 
 use ulid::Ulid;
 
@@ -18,9 +18,13 @@ fn form_tempdir(temp_path: PathBuf) -> Option<TempDir> {
 
 
 pub fn get_named_tempdir(temp_subdir: &String) -> Option<TempDir> {
-    let mut epi4you = find_db().unwrap().epi4you_path;
-    epi4you.push(temp_subdir);
-    return form_tempdir(epi4you)
+    let epi2medb = find_db();
+    let mut epi4you_path = env::temp_dir();
+    if epi2medb.is_some() {
+        epi4you_path = find_db().unwrap().epi4you_path;
+    } 
+    epi4you_path.push(temp_subdir);
+    return form_tempdir(epi4you_path);
 }
 
 

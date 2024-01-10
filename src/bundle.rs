@@ -201,7 +201,12 @@ fn fish_files(source: &PathBuf, local_prefix: &PathBuf) -> Vec<FileManifest> {
 
 
 pub fn export_cli_run(ulidstr: &String, source: PathBuf, temp_dir: TempDir, dest: PathBuf, nextflow_stdout: &String, timestamp: &String) {
-    let local_prefix = epi2me_db::find_db().unwrap().epi2path;
+    let epi2db = epi2me_db::find_db();
+    let mut local_prefix = PathBuf::from("/");
+    if epi2db.is_some() {
+        local_prefix = epi2db.unwrap().epi2path;
+    }
+    
     let mut manifest = get_manifest(&temp_dir.path).unwrap();
     let mut all_files: Vec<FileManifest> = Vec::new();
 

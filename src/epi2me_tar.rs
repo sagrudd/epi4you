@@ -10,7 +10,11 @@ pub fn tar(tarfile: PathBuf, files: &Vec<FileManifest>, manifest: &PathBuf) {
     let tarfile = File::create(tarfile).unwrap();
     let mut a = Builder::new(tarfile);
 
-    let local_prefix = epi2me_db::find_db().unwrap().epi2path;
+    let epi2db = epi2me_db::find_db();
+    let mut local_prefix = PathBuf::from("/");
+    if epi2db.is_some() {
+        local_prefix = epi2db.unwrap().epi2path;
+    }
     let _ = env::set_current_dir(&local_prefix);
 
     for file in files {

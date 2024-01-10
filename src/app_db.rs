@@ -561,7 +561,8 @@ pub fn insert_untarred_desktop_analysis(desktop_analysis: &Epi2meDesktopAnalysis
             let file_to_check = PathBuf::from(&src_dir).join(&file.relative_path).join(PathBuf::from(&file.filename));
             
             let mut rp = PathBuf::from(&file.relative_path);
-            if rp.starts_with("instances") || rp.starts_with("import_export_4you") {
+            //println!("relative path == {:?}", rp);
+            if rp.starts_with("instances") || rp.starts_with("import_export_4you") || rp.starts_with("tmp") {
                 if rp.starts_with("instances") {
                     rp = PathBuf::from(rp.strip_prefix("instances").unwrap());
                     let exp_dir = vec![String::from(&e2eitem.workflowRepo), String::from(&e2eitem.id)].join("_");
@@ -570,6 +571,13 @@ pub fn insert_untarred_desktop_analysis(desktop_analysis: &Epi2meDesktopAnalysis
                     }
                 } else if rp.starts_with("import_export_4you") {
                     rp = PathBuf::from(rp.strip_prefix("import_export_4you").unwrap());
+                    // there is a presumption here that the first path element is just a ulid string from packaging cli nextflow run
+                    // -- just clip it  
+                    let mut components = rp.components();
+                    let c = components.next().unwrap().as_os_str().to_str().unwrap();
+                    rp = PathBuf::from(rp.strip_prefix(c).unwrap());
+                } else if rp.starts_with("tmp") {
+                    rp = PathBuf::from(rp.strip_prefix("tmp").unwrap());
                     // there is a presumption here that the first path element is just a ulid string from packaging cli nextflow run
                     // -- just clip it  
                     let mut components = rp.components();
