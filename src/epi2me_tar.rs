@@ -49,7 +49,7 @@ pub fn untar(tarfile: &PathBuf) -> Option<PathBuf> {
                 return None;
             }
         }
-        return Some(local_prefix.clone());
+        return Some(local_prefix);
     }
 
     return None;

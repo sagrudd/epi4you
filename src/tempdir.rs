@@ -5,22 +5,28 @@ use ulid::Ulid;
 use crate::epi2me_db::find_db;
 
 
-
-pub fn get_tempdir() -> Option<TempDir> {
-    let x = find_db();
-    if x.is_some() {
-        let mut epi4you = x.unwrap().epi4you_path;
-        let ulid_str = Ulid::new().to_string();
-        epi4you.push(ulid_str);
-        let tempdir = TempDir{path: PathBuf::from(&epi4you)};
-        let status = create_dir_all(&epi4you);
-        if status.is_ok() {
-            println!("using tempdir at [{}]", &tempdir);
-            return Some(tempdir);
-        }
+fn form_tempdir(temp_path: PathBuf) -> Option<TempDir> {
+    let tempdir = TempDir{path: PathBuf::from(&temp_path)};
+    let status = create_dir_all(temp_path);
+    if status.is_ok() {
+        println!("using tempdir at [{}]", &tempdir);
+        return Some(tempdir);
     }
     eprintln!("unable to create temporary directory ...");
     return None;
+}
+
+
+pub fn get_named_tempdir(temp_subdir: &String) -> Option<TempDir> {
+    let mut epi4you = find_db().unwrap().epi4you_path;
+    epi4you.push(temp_subdir);
+    return form_tempdir(epi4you)
+}
+
+
+pub fn get_tempdir() -> Option<TempDir> {
+    let ulid_str = Ulid::new().to_string();
+    return get_named_tempdir(&ulid_str);
 }
 
 #[derive(Clone)]
