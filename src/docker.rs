@@ -259,23 +259,27 @@ async fn export_containers(containers: &Vec<String>, p: &PathBuf) {
             let mut write_path = p.clone();
             write_path.push(format!("{}.tar", container.clone().replace("/", "-")));
 
+            println!("writing to file [{}]", write_path.display());
+
             let images = docker.clone().unwrap().images();
             let image = images.get(container);
             let export_stream = image.export();
             let export_data = export_stream.try_concat().await.expect("image archive");
 
             let file = fs::OpenOptions::new()
-            // .create(true) // To create a new file
+            .create(true) // To create a new file
             .write(true)
             // either use the ? operator or unwrap since it returns a Result
             .open(write_path);
         
             if file.is_ok() {
-
+                println!("file is OK!");
                 let xxx = file.unwrap().write_all(&export_data);
                 if xxx.is_err() {
                     eprintln!("{:?}", xxx.err());
                 }
+            } else {
+                eprintln!("file is fubar\n{:?}", file.err());
             }
         }
 
