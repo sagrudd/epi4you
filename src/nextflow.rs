@@ -462,7 +462,7 @@ impl Serialize for ProgressJson {
 }
 
 
-pub fn bundle_cli_run(temp_dir: &TempDir, wf_analysis: NxfLogItem, src_dir: &PathBuf, twome: &Option<String>) {
+pub fn bundle_cli_run(temp_dir: &TempDir, wf_analysis: NxfLogItem, src_dir: &PathBuf, twome: &Option<String>, force: &bool) {
 
     // assign a ULID for this bundle ...
     let ulid_str = Ulid::new().to_string();
@@ -577,13 +577,13 @@ pub fn bundle_cli_run(temp_dir: &TempDir, wf_analysis: NxfLogItem, src_dir: &Pat
         eprintln!("twome destination [{:?}] already exists - use `--force`?", dest);
         return;
     }
-    bundle::export_cli_run(&ulid_str, temp_dir.path.clone(), temp_dir.clone(), dest, &nextflow_stdout.clone().unwrap(), &wf_analysis.timestamp);
+    bundle::export_cli_run(&ulid_str, temp_dir.path.clone(), temp_dir.clone(), dest, &nextflow_stdout.clone().unwrap(), &wf_analysis.timestamp, force);
 
 }
 
 
 
-pub fn nextflow_manager(list: &bool, nxf_bin: &Option<String>, nxf_work: &Option<String>, runid: &Option<String>, twome: &Option<String>) {
+pub fn nextflow_run_manager(list: &bool, nxf_bin: &Option<String>, nxf_work: &Option<String>, runid: &Option<String>, twome: &Option<String>, force: &bool) {
     let mut nxf_workdir = nxf_work.clone();
     if nxf_workdir.is_none() {
         nxf_workdir = Some(env::current_dir().unwrap().to_string_lossy().into_owned());
@@ -623,9 +623,60 @@ pub fn nextflow_manager(list: &bool, nxf_bin: &Option<String>, nxf_work: &Option
             let temp_dir = tempdir.unwrap();
             
 
-            bundle_cli_run(&temp_dir, wf_analysis.unwrap(), &src_dir, twome);
+            bundle_cli_run(&temp_dir, wf_analysis.unwrap(), &src_dir, twome, force);
         
         
         } 
     }
+}
+
+
+fn list_installed_nextflow_artifacts() -> Option<DataFrame> {
+
+    let mut artifacts: Vec<String> = Vec::new();
+
+    // run nextflow list
+    let output = Command::new("nextflow")
+        .arg("list")
+        .output()
+        .expect("failed to execute process");
+
+
+    let s = String::from_utf8_lossy(&output.stdout).into_owned();
+    let trimmed_s = s.trim();
+
+    let lines = trimmed_s.split("\n");
+    for line in lines {
+        
+        println!("split item {}", line);
+    }
+
+    // then if the workflow makes sense grab its config with
+
+    // nextflow config epi2me-labs/wf-metagenomics
+
+    // parse out at least the manifest.version
+
+    return None;
+}
+
+pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &Option<String>, pull: &bool, twome: &Option<String>, force: &bool, docker: &bool) {
+    let nextflow_bin = get_nextflow_path(nxf_bin.clone());
+    if nextflow_bin.is_some() {
+
+        let extant_artifacts = list_installed_nextflow_artifacts();
+
+        if *list {
+
+            
+
+        } else {
+
+            for workflow_candidate in workflow {
+
+            }
+
+        }
+    }
+
 }

@@ -200,7 +200,7 @@ fn fish_files(source: &PathBuf, local_prefix: &PathBuf) -> Vec<FileManifest> {
 }
 
 
-pub fn export_cli_run(ulidstr: &String, source: PathBuf, temp_dir: TempDir, dest: PathBuf, nextflow_stdout: &String, timestamp: &String) {
+pub fn export_cli_run(ulidstr: &String, source: PathBuf, temp_dir: TempDir, dest: PathBuf, nextflow_stdout: &String, timestamp: &String, force: &bool) {
     let epi2db = epi2me_db::find_db();
     let mut local_prefix = PathBuf::from("/");
     if epi2db.is_some() {
@@ -248,7 +248,12 @@ pub fn export_cli_run(ulidstr: &String, source: PathBuf, temp_dir: TempDir, dest
     write_manifest_str(&manifest, &manifest_pb);
 
     // tar up the contents specified in the manifest
-    epi2me_tar::tar(dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
+    if dest.exists() && !*force {
+        eprintln!("destination archive already exists - cannot continue without `--force`")
+    } else {
+        // tar up the contents specified in the manifest
+        epi2me_tar::tar(dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
+    }
 
 }
 

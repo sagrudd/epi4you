@@ -3,8 +3,8 @@ use clap::{Parser, Subcommand, ArgAction};
 use docker::docker_agent;
 use epi2me_db::epi2me_manager;
 use importer::import_manager;
+use nextflow::nextflow_artifact_manager;
 use workflow::workflow_manager;
-
 
 mod app_db;
 mod bundle;
@@ -63,26 +63,6 @@ enum Datatypes {
         clone: Option<String>,
     },
 
-    /// the core nextflow workflows used by the application
-    Workflow {
-        /// List project linked containers
-        #[arg(short, long, action=ArgAction::SetTrue)]
-        list: bool,
-
-        /// specify a workflow
-        #[arg(num_args(0..), short, long)]
-        workflow: Vec<String>,
-
-        /// target twome archive file
-        #[arg(short, long)]
-        twome: Option<String>,
-
-        /// force overwrite of exising twome archive
-        #[arg(short, long, action=ArgAction::SetTrue)]
-        force: bool,
-
-    },
-
     /// containers used by the EPI2ME software
     Docker {
         /// define EPI2ME Desktop analysis
@@ -100,30 +80,6 @@ enum Datatypes {
         /// Export containers into archive
         #[arg(short, long)]
         export: Option<String>,
-    },
-
-
-    /// bioinformatics workflows
-    Nextflow {
-        /// List analyses run using Desktop Client
-        #[arg(short, long, action=ArgAction::SetTrue)]
-        list: bool,
-
-        /// path to nextflow binary (if not obvious)
-        #[arg(short, long, default_value = None)]
-        nxf_bin: Option<String>,
-
-        /// path to nextflow work folder
-        #[arg(short = 'w', long, default_value = None)]
-        nxf_work: Option<String>,
-
-        /// Export EPI2ME analysis by nun_name
-        #[arg(short, long)]
-        runid: Option<String>,
-
-        /// target twome archive file
-        #[arg(short, long)]
-        twome: Option<String>,
     },
 
     /// EPI2ME workflow results
@@ -158,7 +114,86 @@ enum Datatypes {
         /// force overwrite of exising twome archive
         #[arg(short, long, action=ArgAction::SetTrue)]
         force: bool,
-    }
+    },
+
+    /// interaction and bundling of CLI-based nextflow artifacts
+    NextflowArtifact {
+        /// List artifacts installed by CLI nextflow
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        list: bool,
+
+        /// workflows to pull and bundle through the nextflow CLI
+        #[arg(num_args(0..), short, long)]
+        workflow: Vec<String>,
+
+        /// path to nextflow binary (if not obvious)
+        #[arg(short, long, default_value = None)]
+        nxf_bin: Option<String>,
+
+        /// perform a nextflow pull update if workflow not downloaded
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        pull: bool,
+
+        /// target twome archive file
+        #[arg(short, long)]
+        twome: Option<String>,
+
+        /// force overwrite of exising twome archive
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        force: bool,
+
+        /// bundle accompanying docker containers
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        docker: bool,
+    },
+
+
+    /// cli exectured nextflow runs
+    NextflowRun {
+        /// List analyses run using Desktop Client
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        list: bool,
+
+        /// path to nextflow binary (if not obvious)
+        #[arg(short, long, default_value = None)]
+        nxf_bin: Option<String>,
+
+        /// path to nextflow work folder
+        #[arg(short = 'w', long, default_value = None)]
+        nxf_work: Option<String>,
+
+        /// Export EPI2ME analysis by nun_name
+        #[arg(short, long)]
+        runid: Option<String>,
+
+        /// target twome archive file
+        #[arg(short, long)]
+        twome: Option<String>,
+
+        /// force overwrite of exising twome archive
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        force: bool,
+    },
+
+    /// the core nextflow workflows used by the application
+    Workflow {
+        /// List project linked containers
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        list: bool,
+
+        /// specify a workflow
+        #[arg(num_args(0..), short, long)]
+        workflow: Vec<String>,
+
+        /// target twome archive file
+        #[arg(short, long)]
+        twome: Option<String>,
+
+        /// force overwrite of exising twome archive
+        #[arg(short, long, action=ArgAction::SetTrue)]
+        force: bool,
+
+    },
 }
 
 #[tokio::main]
@@ -196,8 +231,12 @@ async fn main() {
                     workflow_manager(list, workflow, twome, force);
                 },
 
-                Some(Datatypes::Nextflow { list, nxf_bin, nxf_work, runid, twome }) => {
-                    nextflow::nextflow_manager(list, nxf_bin, nxf_work, runid, twome);
+                Some(Datatypes::NextflowArtifact { list, workflow, nxf_bin, pull, twome, force, docker }) => {
+                    nextflow_artifact_manager(list, workflow, nxf_bin, pull, twome, force, docker);
+                },
+
+                Some(Datatypes::NextflowRun { list, nxf_bin, nxf_work, runid, twome, force }) => {
+                    nextflow::nextflow_run_manager(list, nxf_bin, nxf_work, runid, twome, force);
                 },
 
                 Some(Datatypes::EPI2ME { list, bundlewf, runid, twome, force }) => {
