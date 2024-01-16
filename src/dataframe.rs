@@ -3,7 +3,7 @@ use std::env;
 use polars_core::prelude::*;
 use polars::prelude::*;
 
-use crate::{workflow::Workflow, app_db::Epi2MeAnalysis, nextflow::NxfLogItem};
+use crate::{workflow::Workflow, app_db::Epi2MeAnalysis, nextflow::{NxfLogItem, NextflowAssetWorkflow}};
 
 
 #[macro_export]
@@ -51,6 +51,12 @@ pub fn nextflow_vec_to_df(vec: Vec<NxfLogItem>) -> DataFrame {
         revision_id,
         session_id,
         command]).unwrap()
+}
+
+pub fn nf_wf_vec_to_df(vec: Vec<NextflowAssetWorkflow>) -> DataFrame {
+    struct_to_dataframe!(vec, [workflow,
+        path,
+        version]).unwrap()
 }
 
 

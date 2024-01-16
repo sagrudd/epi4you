@@ -12,6 +12,8 @@ use glob::glob;
 use serde::ser::SerializeMap;
 
 
+use crate::dataframe::nf_wf_vec_to_df;
+use crate::docker::nextflow_parser;
 use crate::tempdir::TempDir;
 use crate::{bundle, tempdir};
 use crate::{dataframe::{nextflow_vec_to_df, print_polars_df}, bundle::anyvalue_to_str};
@@ -631,9 +633,58 @@ pub fn nextflow_run_manager(list: &bool, nxf_bin: &Option<String>, nxf_work: &Op
 }
 
 
+fn extract_nextflow_workflow_config(workflow_id: &str) -> String {
+
+    let output = Command::new("nextflow")
+        .arg("config")
+        .arg(workflow_id)
+        .output()
+        .expect("failed to execute process");
+
+    let wf_config = String::from_utf8_lossy(&output.stdout).into_owned();
+    //println!("{}", wf_config);
+    let config = nextflow_parser(&wf_config);
+    let mut version = String::from("?");
+    if config.get("manifest.version").is_some() {
+        version = String::from(config.get("manifest.version").unwrap());
+    }
+    //println!("workflow version [{}]", version);
+    return version;
+}
+
+
+fn parse_nextflow_workflow_info(workflow_id: &str) -> String {
+    let lp = "local path  :";
+    let output = Command::new("nextflow")
+        .arg("info")
+        .arg(workflow_id)
+        .output()
+        .expect("failed to execute process");
+    
+    let wf_info = String::from_utf8_lossy(&output.stdout).into_owned();
+    let mut wf_path = String::from("undefined");
+    //println!("{}", wf_info);
+    let wf_info_lines = wf_info.lines();
+    for line in wf_info_lines {
+        if line.contains(lp) {
+            // println!("{}", line);
+            wf_path = String::from(line.replace(lp, "").trim());
+        }
+    }
+    return wf_path;
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug)]
+pub struct NextflowAssetWorkflow {
+    pub workflow: String,
+    pub path: String,
+    pub version: String,
+}
+
 fn list_installed_nextflow_artifacts() -> Option<DataFrame> {
 
-    let mut artifacts: Vec<String> = Vec::new();
+    let mut artifacts: Vec<NextflowAssetWorkflow> = Vec::new();
 
     // run nextflow list
     let output = Command::new("nextflow")
@@ -641,23 +692,26 @@ fn list_installed_nextflow_artifacts() -> Option<DataFrame> {
         .output()
         .expect("failed to execute process");
 
-
     let s = String::from_utf8_lossy(&output.stdout).into_owned();
     let trimmed_s = s.trim();
 
-    let lines = trimmed_s.split("\n");
+    let lines = trimmed_s.lines();
     for line in lines {
-        
-        println!("split item {}", line);
+        // println!("split item {}", line);
+        // if we are here, then this is a legit nextflow workflow ---
+        let wf_path = parse_nextflow_workflow_info(line);
+        let wf_version = extract_nextflow_workflow_config(line);
+
+        let wf = NextflowAssetWorkflow{
+            workflow: String::from(line),
+            path: String::from(wf_path),
+            version: String::from(wf_version),
+        };
+        artifacts.push(wf);
     }
+    let df = nf_wf_vec_to_df(artifacts);
 
-    // then if the workflow makes sense grab its config with
-
-    // nextflow config epi2me-labs/wf-metagenomics
-
-    // parse out at least the manifest.version
-
-    return None;
+    return Some(df);
 }
 
 pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &Option<String>, pull: &bool, twome: &Option<String>, force: &bool, docker: &bool) {
@@ -667,9 +721,9 @@ pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &
         let extant_artifacts = list_installed_nextflow_artifacts();
 
         if *list {
-
-            
-
+            if extant_artifacts.as_ref().is_some() {
+                print_polars_df(&extant_artifacts.unwrap());
+            }
         } else {
 
             for workflow_candidate in workflow {
