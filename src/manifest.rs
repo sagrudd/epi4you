@@ -247,7 +247,7 @@ fn validate_manifest_files(file_manifest: &Vec<FileManifest>) -> Option<bool> {
 }
 
 
-pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> Option<Vec<Epi2MeContent>> {
+pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf, force: &bool) -> Option<Vec<Epi2MeContent>> {
 
     let mut successful_content: Vec<Epi2MeContent> = Vec::new();
 
@@ -259,6 +259,7 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> Option<
     println!("observed manifest checksum  [{}]", resignature);
 
     if signature != resignature {
+        eprintln!("There is inconsistency in the checksums - cannot trust this content!");
         return None;
     }
 
@@ -268,16 +269,17 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> Option<
         println!("tarfile successfully unpacked - sanity checking the packed files ...");
 
         for cfile in &manifest.payload {
-            let is_desktop_payload = matches!(cfile, Epi2MeContent::Epi2mePayload { .. });
-            let is_epi2me_workflow = matches!(cfile, Epi2MeContent::Epi2meWf { .. });
-            println!("Epi2mePayload :: {:?}", is_desktop_payload);
-            println!("Epi2meWorkflow :: {:?}", is_epi2me_workflow);
+            //let is_desktop_payload = matches!(cfile, Epi2MeContent::Epi2mePayload { .. });
+            //let is_epi2me_workflow = matches!(cfile, Epi2MeContent::Epi2meWf { .. });
+            //println!("Epi2mePayload :: {:?}", is_desktop_payload);
+            //println!("Epi2meWorkflow :: {:?}", is_epi2me_workflow);
 
             match cfile {
                 Epi2MeContent::Epi2meWf(epi2me_workflow) => {
                      println!("Epi2MEWorkflow");
                      let x = validate_manifest_files(&epi2me_workflow.files);
                      if x.is_none() {
+                        eprintln!("failed to validate the workflow manifest files - quitting");
                         return None;
                      }
                      successful_content.push(cfile.clone());
@@ -287,7 +289,8 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf) -> Option<
                     println!("Epi2MEWorkflow");
                     let x = validate_manifest_files(&desktop_analysis.files);
                     if x.is_none() {
-                       return None;
+                        eprintln!("failed to validate the analysis manifest files - quitting");
+                        return None;
                     }
                     // if we are here then the manifest specified files are present and coherent; we're good to go ...
                     successful_content.push(cfile.clone());

@@ -43,7 +43,7 @@ pub fn import_manager(twome: &Option<String>, force: &bool) {
 
             }
 
-            let honest = is_manifest_honest(&manifest.unwrap(), &path);
+            let honest = is_manifest_honest(&manifest.unwrap(), &path, force);
             if honest.is_none() {
                 eprintln!("this epi4you archive is not trusted - exiting");
                 return;
