@@ -247,7 +247,7 @@ fn validate_manifest_files(file_manifest: &Vec<FileManifest>) -> Option<bool> {
 }
 
 
-pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf, force: &bool) -> Option<Vec<Epi2MeContent>> {
+pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf, _force: &bool) -> Option<Vec<Epi2MeContent>> {
 
     let mut successful_content: Vec<Epi2MeContent> = Vec::new();
 
