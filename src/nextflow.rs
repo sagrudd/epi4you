@@ -15,6 +15,7 @@ use serde::ser::SerializeMap;
 use crate::bundle::export_nf_workflow;
 use crate::dataframe::{nf_wf_vec_to_df, filter_df_by_value, workflow_vec_to_df};
 use crate::docker::nextflow_parser;
+use crate::settings::list_available_workflows;
 use crate::tempdir::TempDir;
 use crate::workflow::Workflow;
 use crate::{bundle, tempdir};
@@ -803,18 +804,25 @@ pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &
 
             let temp_dir = tempdir.unwrap();
             let mut wfs: Vec<Workflow> = Vec::new();
-            
-            for workflow_candidate in workflow {
-                println!("checking [{}]", workflow_candidate);
 
-                let asset_opt = get_workflow_entity(nextflow_bin.as_ref().unwrap(), workflow_candidate);
+            let workflows: Vec<String>;
+            if workflow.into_iter().nth(0).unwrap().to_owned() == String::from("all") {
+                workflows = list_available_workflows();
+            } else {
+                workflows = workflow.into_iter().map(|v|v.to_owned()).collect();
+            }
+            
+            for workflow_candidate in workflows {
+                println!("checking [{}]", &workflow_candidate);
+
+                let asset_opt = get_workflow_entity(nextflow_bin.as_ref().unwrap(), &workflow_candidate);
                 let asset: NextflowAssetWorkflow;
                 if asset_opt.is_some() {
                     asset = asset_opt.unwrap();
                 } else {
                     // None - likely due to not existing ...
                     if *pull {
-                        let asset_o = nextflow_workflow_pull(nextflow_bin.as_ref().unwrap(), workflow_candidate);
+                        let asset_o = nextflow_workflow_pull(nextflow_bin.as_ref().unwrap(), &workflow_candidate);
                         if asset_o.is_some() {
                             asset = asset_o.unwrap();
                         } else {
@@ -831,7 +839,7 @@ pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &
 
                 let mut local_output = temp_dir.path.clone();
                 local_output.push("workflows");
-                local_output.push(workflow_candidate);
+                local_output.push(&workflow_candidate);
                 let _create_d = fs::create_dir(&local_output);
                 let ap = &asset.path;
                 for entry in WalkDir::new(ap) {

@@ -18,6 +18,7 @@ mod nextflow;
 mod provenance;
 mod tempdir;
 mod workflow;
+mod settings;
 
 /// Trivial application to package EPI2ME workflows and analysis results
 #[derive(Parser)]
