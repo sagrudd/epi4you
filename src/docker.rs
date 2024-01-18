@@ -94,7 +94,7 @@ pub fn nextflow_parser(xcontents: &String) -> HashMap<String, String> {
 }
 
 
-fn extract_containers(config: &HashMap<String, String>) -> Vec<String> {
+pub fn extract_containers(config: &HashMap<String, String>) -> Vec<String> {
     let mut container_vec: Vec<String> = Vec::new();
     let prefix = String::from("process.");
     let suffix = String::from("container");

@@ -13,8 +13,8 @@ use serde::ser::SerializeMap;
 
 
 use crate::bundle::export_nf_workflow;
-use crate::dataframe::{nf_wf_vec_to_df, filter_df_by_value, workflow_vec_to_df};
-use crate::docker::nextflow_parser;
+use crate::dataframe::{nf_wf_vec_to_df, workflow_vec_to_df};
+use crate::docker::{nextflow_parser, extract_containers};
 use crate::settings::list_available_workflows;
 use crate::tempdir::TempDir;
 use crate::workflow::Workflow;
@@ -562,12 +562,12 @@ pub fn bundle_cli_run(temp_dir: &TempDir, wf_analysis: NxfLogItem, src_dir: &Pat
                 let gg = core_p.unwrap();
                 let mut dest_f = local_output.clone();
                 dest_f.push(&gg);
-                println!("src {:?} -> ", &dest_f);
+                // println!("src {:?} -> ", &dest_f);
 
                 if ent.path().is_dir() {
                     let _create_d = fs::create_dir_all(dest_f);
                 } else if ent.path().is_file() {
-                    println!("copying ...");
+                    // println!("copying ...");
                     let _copy_f = fs::copy(ent.path(), dest_f);
                 }
             }
@@ -633,7 +633,7 @@ pub fn nextflow_run_manager(list: &bool, nxf_bin: &Option<String>, nxf_work: &Op
 }
 
 
-fn extract_nextflow_workflow_config(workflow_id: &str) -> String {
+fn extract_nextflow_workflow_config(workflow_id: &str) -> (String, HashMap<String, String>) {
 
     let output = Command::new("nextflow")
         .arg("config")
@@ -649,7 +649,7 @@ fn extract_nextflow_workflow_config(workflow_id: &str) -> String {
         version = String::from(config.get("manifest.version").unwrap());
     }
     //println!("workflow version [{}]", version);
-    return version;
+    return (version, config);
 }
 
 
@@ -680,6 +680,7 @@ pub struct NextflowAssetWorkflow {
     pub workflow: String,
     pub path: String,
     pub version: String,
+    pub config: HashMap<String, String>,
 }
 
 fn nextflow_workflow_pull(nxf_bin: &String, workflow: &String) -> Option<NextflowAssetWorkflow> {
@@ -699,20 +700,20 @@ fn nextflow_workflow_pull(nxf_bin: &String, workflow: &String) -> Option<Nextflo
     }
     
     let wf_path = parse_nextflow_workflow_info(workflow);
-    let wf_version = extract_nextflow_workflow_config(workflow);
+    let (wf_version, config) = extract_nextflow_workflow_config(workflow);
 
     let wf = NextflowAssetWorkflow{
         workflow: String::from(workflow),
         path: String::from(wf_path),
         version: String::from(wf_version),
+        config: config,
     };
 
     return Some(wf);
 }
 
 
-fn list_installed_nextflow_artifacts(nxf_bin: &String) -> Option<DataFrame> {
-
+fn get_local_artifacts(nxf_bin: &String) -> Vec<NextflowAssetWorkflow> {
     let mut artifacts: Vec<NextflowAssetWorkflow> = Vec::new();
 
     // run nextflow list
@@ -729,53 +730,38 @@ fn list_installed_nextflow_artifacts(nxf_bin: &String) -> Option<DataFrame> {
         // println!("split item {}", line);
         // if we are here, then this is a legit nextflow workflow ---
         let wf_path = parse_nextflow_workflow_info(line);
-        let wf_version = extract_nextflow_workflow_config(line);
+        let (wf_version, config) = extract_nextflow_workflow_config(line);
 
         let wf = NextflowAssetWorkflow{
             workflow: String::from(line),
             path: String::from(wf_path),
             version: String::from(wf_version),
+            config: config,
         };
         artifacts.push(wf);
     }
-    let df = nf_wf_vec_to_df(artifacts);
+    return artifacts;
+}
 
+
+fn list_installed_nextflow_artifacts(nxf_bin: &String) -> Option<DataFrame> {
+    let artifacts = get_local_artifacts(nxf_bin);
+    let df = nf_wf_vec_to_df(artifacts);
     return Some(df);
 }
 
 
-fn get_workflow_entity(nxf_bin: &String, key: &String) -> Option<NextflowAssetWorkflow> {
-
-    let extant_artifacts = list_installed_nextflow_artifacts(nxf_bin);
-    if extant_artifacts.as_ref().is_some() {
-        let df = extant_artifacts.unwrap();
-        let zz = filter_df_by_value(&df, &String::from("workflow"), key);
-        if zz.is_ok() {
-            // println!("zz parsed \n{:?}", zz);
-            let df = zz.unwrap();
-            let count = df.height();
-            let version: String;
-            let path: String;
-
-            if count == 1 {
-                let single_row = df.get(0);
-                if single_row.is_none() {
-                    eprintln!("unexpected emptiness - aborting -");
-                    return None;
-                }
-                let unwrapped_row = single_row.unwrap();
-                path = anyvalue_to_str(unwrapped_row.get(1));
-                version = anyvalue_to_str(unwrapped_row.get(2));
-
-                return Some(NextflowAssetWorkflow{workflow: key.to_owned(), path, version});
-            }
+fn get_workflow_entity(key: &String, extant_artifacts: &Vec<NextflowAssetWorkflow>) -> Option<NextflowAssetWorkflow> {
+    for artif in extant_artifacts {
+        if artif.workflow == key.to_owned() {
+            return Some(artif.to_owned());
         }
     }
     return None;
 }
 
 
-pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &Option<String>, pull: &bool, twome: &Option<String>, force: &bool, _docker: &bool) {
+pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &Option<String>, pull: &bool, twome: &Option<String>, force: &bool, docker: &bool) {
     let nextflow_bin = get_nextflow_path(nxf_bin.clone());
     if nextflow_bin.is_some() {
         if *list {
@@ -805,6 +791,8 @@ pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &
             let temp_dir = tempdir.unwrap();
             let mut wfs: Vec<Workflow> = Vec::new();
 
+            let artifacts = get_local_artifacts(&nextflow_bin.as_ref().unwrap());
+
             let workflows: Vec<String>;
             if workflow.into_iter().nth(0).unwrap().to_owned() == String::from("all") {
                 workflows = list_available_workflows();
@@ -815,8 +803,9 @@ pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &
             for workflow_candidate in workflows {
                 println!("checking [{}]", &workflow_candidate);
 
-                let asset_opt = get_workflow_entity(nextflow_bin.as_ref().unwrap(), &workflow_candidate);
+                let asset_opt = get_workflow_entity(&workflow_candidate, &artifacts);
                 let asset: NextflowAssetWorkflow;
+
                 if asset_opt.is_some() {
                     asset = asset_opt.unwrap();
                 } else {
@@ -850,12 +839,12 @@ pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &
                             let gg = core_p.unwrap();
                             let mut dest_f = local_output.clone();
                             dest_f.push(&gg);
-                            println!("src {:?} -> ", &dest_f);
+                            // println!("src {:?} -> ", &dest_f);
 
                             if ent.path().is_dir() {
                                 let _create_d = fs::create_dir_all(dest_f);
                             } else if ent.path().is_file() {
-                                println!("copying ...");
+                                // println!("copying ...");
                                 let _copy_f = fs::copy(ent.path(), dest_f);
                             }
                         }
@@ -866,6 +855,14 @@ pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &
                 let (project, name) = split.unwrap();
                 let w = Workflow { project: String::from(project), name: String::from(name), version: asset.version};
                 wfs.push(w);
+
+                if *docker {
+                    let _x = extract_containers(&asset.config);
+                    for container in _x {
+                        println!("we have a [{}] container .... ", container);
+                    }
+                }
+
             }
 
             // we need a dataframe for the items that we'll inject ...

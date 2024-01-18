@@ -24,7 +24,7 @@ pub fn tar(wf_path: Option<&PathBuf>, tarfile: PathBuf, files: &Vec<FileManifest
         let mut file_to_tar = PathBuf::from(file.relative_path.clone());
         file_to_tar.push(&file.filename);
 
-        println!("adding file [{}] to tarball", file_to_tar.as_os_str().to_str().unwrap());
+        // println!("adding file [{}] to tarball", file_to_tar.as_os_str().to_str().unwrap());
 
         let _ = a.append_path(file_to_tar);
     }
