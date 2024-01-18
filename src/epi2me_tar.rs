@@ -5,14 +5,16 @@ use tar::{Builder, Archive};
 use crate::{manifest::FileManifest, epi2me_db};
 
 
-pub fn tar(tarfile: PathBuf, files: &Vec<FileManifest>, manifest: &PathBuf) {
+pub fn tar(wf_path: Option<&PathBuf>, tarfile: PathBuf, files: &Vec<FileManifest>, manifest: &PathBuf) {
 
     let tarfile = File::create(tarfile).unwrap();
     let mut a = Builder::new(tarfile);
 
     let epi2db = epi2me_db::find_db();
     let mut local_prefix = PathBuf::from("/");
-    if epi2db.is_some() {
+    if wf_path.is_some() {
+        local_prefix = wf_path.unwrap().to_owned();
+    } else if epi2db.is_some() {
         local_prefix = epi2db.unwrap().epi2path;
     }
     let _ = env::set_current_dir(&local_prefix);

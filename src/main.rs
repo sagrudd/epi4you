@@ -3,7 +3,6 @@ use clap::{Parser, Subcommand, ArgAction};
 use docker::docker_agent;
 use epi2me_db::epi2me_manager;
 use importer::import_manager;
-use nextflow::nextflow_artifact_manager;
 use workflow::workflow_manager;
 
 mod app_db;
@@ -232,7 +231,7 @@ async fn main() {
                 },
 
                 Some(Datatypes::NextflowArtifact { list, workflow, nxf_bin, pull, twome, force, docker }) => {
-                    nextflow_artifact_manager(list, workflow, nxf_bin, pull, twome, force, docker);
+                    nextflow::nextflow_artifact_manager(list, workflow, nxf_bin, pull, twome, force, docker);
                 },
 
                 Some(Datatypes::NextflowRun { list, nxf_bin, nxf_work, runid, twome, force }) => {

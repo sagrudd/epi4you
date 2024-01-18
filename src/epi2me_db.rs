@@ -196,7 +196,7 @@ pub fn epi2me_manager(epi2me: &Epi2meSetup, df: &DataFrame, list: &bool, runids:
 
     // we have a destination and a unique runid - let's package something ...
     
-    bundle::export_desktop_run(runids, df, Some(absolute_path), &bundle_wfs);
+    bundle::export_desktop_run(None, runids, df, Some(absolute_path), &bundle_wfs);
 
     
 }

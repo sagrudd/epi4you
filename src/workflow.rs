@@ -248,6 +248,6 @@ pub fn workflow_manager(list: &bool, workflow: &Vec<String>, twome: &Option<Stri
     print_polars_df(&picked);
 
     // and now export into an archive ...
-    export_nf_workflow(&picked, twome, force);
+    export_nf_workflow(None, &picked, twome, force);
 
 }

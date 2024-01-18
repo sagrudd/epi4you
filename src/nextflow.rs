@@ -12,9 +12,11 @@ use glob::glob;
 use serde::ser::SerializeMap;
 
 
-use crate::dataframe::nf_wf_vec_to_df;
+use crate::bundle::export_nf_workflow;
+use crate::dataframe::{nf_wf_vec_to_df, filter_df_by_value, workflow_vec_to_df};
 use crate::docker::nextflow_parser;
 use crate::tempdir::TempDir;
+use crate::workflow::Workflow;
 use crate::{bundle, tempdir};
 use crate::{dataframe::{nextflow_vec_to_df, print_polars_df}, bundle::anyvalue_to_str};
 
@@ -390,8 +392,8 @@ fn prepare_progress_json(nextflow_stdout: &String, temp_dir: &PathBuf, ulid_str:
     let v:HashMap<String, ProgressItem> = HashMap::new();
     let mut x = ProgressJson{name: ulid_str.to_owned(), key: v};
 
-    let mut book_reviews: HashMap<String, u16> = HashMap::new();
-    let mut order: Vec<String> = Vec::new();
+    let mut process_counter: HashMap<String, u16> = HashMap::new();
+    let mut bfx_process: Vec<String> = Vec::new();
 
     let subproc = "Submitted process >";
     let lines = nextflow_stdout.split("\n");
@@ -404,17 +406,17 @@ fn prepare_progress_json(nextflow_stdout: &String, temp_dir: &PathBuf, ulid_str:
                 line = &line[..line.find(" (").unwrap()].trim()
             }
 
-            if book_reviews.contains_key(line) {
-                book_reviews.insert(line.to_owned(), book_reviews.get(line).unwrap() + 1);
+            if process_counter.contains_key(line) {
+                process_counter.insert(line.to_owned(), process_counter.get(line).unwrap() + 1);
             } else {
-                book_reviews.insert(line.to_owned(), 1);
-                order.push(line.to_owned());
+                process_counter.insert(line.to_owned(), 1);
+                bfx_process.push(line.to_owned());
             }
         }
     }
 
-    for key in order {
-        let val = book_reviews.get(&key).unwrap();
+    for key in bfx_process {
+        let val = process_counter.get(&key).unwrap();
         let pi = ProgressItem{status: String::from("COMPLETED"), tag: String::from("null"), total: *val, complete: *val};
         x.key.insert(key, pi);
     }
@@ -434,6 +436,7 @@ fn prepare_progress_json(nextflow_stdout: &String, temp_dir: &PathBuf, ulid_str:
     }
     return None;
 }
+
 
 #[derive(Serialize, Deserialize, Clone)]
 #[derive(Debug)]
@@ -623,11 +626,7 @@ pub fn nextflow_run_manager(list: &bool, nxf_bin: &Option<String>, nxf_work: &Op
         let tempdir = tempdir::get_tempdir();
         if tempdir.is_some() {
             let temp_dir = tempdir.unwrap();
-            
-
             bundle_cli_run(&temp_dir, wf_analysis.unwrap(), &src_dir, twome, force);
-        
-        
         } 
     }
 }
@@ -682,12 +681,41 @@ pub struct NextflowAssetWorkflow {
     pub version: String,
 }
 
-fn list_installed_nextflow_artifacts() -> Option<DataFrame> {
+fn nextflow_workflow_pull(nxf_bin: &String, workflow: &String) -> Option<NextflowAssetWorkflow> {
+
+    let output = Command::new(nxf_bin)
+        .arg("pull")
+        .arg(workflow)
+        .output()
+        .expect("failed to execute process");
+
+    let s = String::from_utf8_lossy(&output.stdout).into_owned();
+    let trimmed_s = s.trim();
+
+    if trimmed_s.contains("WARN: Cannot read project manifest") {
+        eprintln!("FUBAR - error with nextflow pull\n{}", trimmed_s);
+        return None;
+    }
+    
+    let wf_path = parse_nextflow_workflow_info(workflow);
+    let wf_version = extract_nextflow_workflow_config(workflow);
+
+    let wf = NextflowAssetWorkflow{
+        workflow: String::from(workflow),
+        path: String::from(wf_path),
+        version: String::from(wf_version),
+    };
+
+    return Some(wf);
+}
+
+
+fn list_installed_nextflow_artifacts(nxf_bin: &String) -> Option<DataFrame> {
 
     let mut artifacts: Vec<NextflowAssetWorkflow> = Vec::new();
 
     // run nextflow list
-    let output = Command::new("nextflow")
+    let output = Command::new(nxf_bin)
         .arg("list")
         .output()
         .expect("failed to execute process");
@@ -714,21 +742,129 @@ fn list_installed_nextflow_artifacts() -> Option<DataFrame> {
     return Some(df);
 }
 
-pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &Option<String>, pull: &bool, twome: &Option<String>, force: &bool, docker: &bool) {
+
+fn get_workflow_entity(nxf_bin: &String, key: &String) -> Option<NextflowAssetWorkflow> {
+
+    let extant_artifacts = list_installed_nextflow_artifacts(nxf_bin);
+    if extant_artifacts.as_ref().is_some() {
+        let df = extant_artifacts.unwrap();
+        let zz = filter_df_by_value(&df, &String::from("workflow"), key);
+        if zz.is_ok() {
+            // println!("zz parsed \n{:?}", zz);
+            let df = zz.unwrap();
+            let count = df.height();
+            let version: String;
+            let path: String;
+
+            if count == 1 {
+                let single_row = df.get(0);
+                if single_row.is_none() {
+                    eprintln!("unexpected emptiness - aborting -");
+                    return None;
+                }
+                let unwrapped_row = single_row.unwrap();
+                path = anyvalue_to_str(unwrapped_row.get(1));
+                version = anyvalue_to_str(unwrapped_row.get(2));
+
+                return Some(NextflowAssetWorkflow{workflow: key.to_owned(), path, version});
+            }
+        }
+    }
+    return None;
+}
+
+
+pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &Option<String>, pull: &bool, twome: &Option<String>, force: &bool, _docker: &bool) {
     let nextflow_bin = get_nextflow_path(nxf_bin.clone());
     if nextflow_bin.is_some() {
-
-        let extant_artifacts = list_installed_nextflow_artifacts();
-
         if *list {
+            let extant_artifacts = list_installed_nextflow_artifacts(nextflow_bin.as_ref().unwrap());
             if extant_artifacts.as_ref().is_some() {
                 print_polars_df(&extant_artifacts.unwrap());
             }
+            return;
         } else {
 
-            for workflow_candidate in workflow {
-
+            if workflow.len() == 0 {
+                eprintln!("\trequires a `--workflow` parameter to specify workflow of interest");
+                return;
             }
+
+            if twome.is_none() {
+                eprintln!("\trequires a `--twome` parameter to specify target archive");
+                return;
+            }
+
+            let tempdir = tempdir::get_tempdir();
+            if tempdir.is_none() {
+                eprintln!("error creating tempdir - aborting!");
+                return;
+            }
+
+            let temp_dir = tempdir.unwrap();
+            let mut wfs: Vec<Workflow> = Vec::new();
+            
+            for workflow_candidate in workflow {
+                println!("checking [{}]", workflow_candidate);
+
+                let asset_opt = get_workflow_entity(nextflow_bin.as_ref().unwrap(), workflow_candidate);
+                let asset: NextflowAssetWorkflow;
+                if asset_opt.is_some() {
+                    asset = asset_opt.unwrap();
+                } else {
+                    // None - likely due to not existing ...
+                    if *pull {
+                        let asset_o = nextflow_workflow_pull(nextflow_bin.as_ref().unwrap(), workflow_candidate);
+                        if asset_o.is_some() {
+                            asset = asset_o.unwrap();
+                        } else {
+                            eprintln!("issue with workflow pull - aborting");
+                            return;
+                        }
+                    } else {
+                        eprintln!("workflow [{}] has not been installed - consider `--pull` - aborting", &workflow_candidate);
+                        return;
+                    }
+                }
+                println!("\tversion [{}] at [{}]", asset.version, asset.path);
+                // clone files into a temporary directory
+
+                let mut local_output = temp_dir.path.clone();
+                local_output.push("workflows");
+                local_output.push(workflow_candidate);
+                let _create_d = fs::create_dir(&local_output);
+                let ap = &asset.path;
+                for entry in WalkDir::new(ap) {
+                    if entry.is_ok() {
+                        let ent = entry.unwrap();
+                        let core_p = ent.path().strip_prefix(ap);
+                        if core_p.is_ok() {
+                            let gg = core_p.unwrap();
+                            let mut dest_f = local_output.clone();
+                            dest_f.push(&gg);
+                            println!("src {:?} -> ", &dest_f);
+
+                            if ent.path().is_dir() {
+                                let _create_d = fs::create_dir_all(dest_f);
+                            } else if ent.path().is_file() {
+                                println!("copying ...");
+                                let _copy_f = fs::copy(ent.path(), dest_f);
+                            }
+                        }
+                    }
+                }
+
+                let split = &workflow_candidate.split_once("/");
+                let (project, name) = split.unwrap();
+                let w = Workflow { project: String::from(project), name: String::from(name), version: asset.version};
+                wfs.push(w);
+            }
+
+            // we need a dataframe for the items that we'll inject ...
+            let df = workflow_vec_to_df(wfs);
+            print_polars_df(&df);
+            export_nf_workflow(Some(&temp_dir.path), &df, twome, force);
+            
 
         }
     }

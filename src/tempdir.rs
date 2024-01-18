@@ -5,7 +5,7 @@ use ulid::Ulid;
 use crate::epi2me_db::find_db;
 
 
-fn form_tempdir(temp_path: PathBuf) -> Option<TempDir> {
+pub fn form_tempdir(temp_path: PathBuf) -> Option<TempDir> {
     let tempdir = TempDir{path: PathBuf::from(&temp_path)};
     let status = create_dir_all(temp_path);
     if status.is_ok() {

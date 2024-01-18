@@ -69,8 +69,13 @@ pub fn anyvalue_to_str(value: Option<&AnyValue>) -> String {
     return String::from("Err!");
 }
 
-pub fn get_workflow_vehicle(project: &String, name: &String, version: &String) -> Epi2meWorkflow {
-    let local_prefix = epi2me_db::find_db().unwrap().epi2path;
+pub fn get_workflow_vehicle(wf_path: Option<&PathBuf>, project: &String, name: &String, version: &String) -> Epi2meWorkflow {
+    let local_prefix: PathBuf;
+    if wf_path.is_some() {
+        local_prefix = wf_path.unwrap().to_owned();
+    } else {
+       local_prefix = epi2me_db::find_db().unwrap().epi2path;
+    }
     let mut vehicle = workflow::get_workflow_struct(&project, &name, &version);
             
     println!("{:?}", vehicle);
@@ -86,17 +91,34 @@ pub fn get_workflow_vehicle(project: &String, name: &String, version: &String) -
 
 
 
-pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>, force: &bool) {
+pub fn export_nf_workflow(wf_path: Option<&PathBuf>, source: &DataFrame, twome: &Option<String>, force: &bool) {
     // core path 
     //let core_path = epi2me_db::find_db().unwrap().epi2wf_dir;
-    let local_prefix = epi2me_db::find_db().unwrap().epi2path;
+    let local_prefix: PathBuf;
+    if wf_path.is_some() {
+        local_prefix = wf_path.unwrap().to_owned();
+    } else {
+        local_prefix = epi2me_db::find_db().unwrap().epi2path;
+    }
 
     // create a temporary path for this export exploration
-    let tempdir = tempdir::get_tempdir();
-    if tempdir.is_none() {
-        return;
+    let temp_dir: TempDir;
+    if wf_path.is_some() {
+        let mut pb = wf_path.unwrap().to_owned();
+        pb.push("manifest");
+        let tempdir = tempdir::form_tempdir(pb);
+        if tempdir.is_none() {
+            return;
+        }
+        temp_dir = tempdir.unwrap();
+    } else {
+        let tempdir = tempdir::get_tempdir();
+        if tempdir.is_none() {
+            return;
+        }
+        temp_dir = tempdir.unwrap();
     }
-    let temp_dir = tempdir.unwrap();
+
     let mut manifest = get_manifest(&temp_dir.path).unwrap();
     let mut all_files: Vec<FileManifest> = Vec::new();
 
@@ -112,7 +134,7 @@ pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>, force: &bo
             let merged = vec![String::from(&project), String::from(&name)].join("/");
             println!("We have some data {}", merged);
 
-            let vehicle = get_workflow_vehicle(&project, &name, &version);
+            let vehicle = get_workflow_vehicle(wf_path, &project, &name, &version);
 
             let filecount = vehicle.files.len();
             let filesize = file_manifest_size(&vehicle.files);
@@ -135,19 +157,21 @@ pub fn export_nf_workflow(source: &DataFrame, twome: &Option<String>, force: &bo
     manifest_pb.push(MANIFEST_JSON);
     write_manifest_str(&manifest, &manifest_pb);
 
-    // as per https://github.com/sagrudd/epi4you/issues/1 - ensure that destination is not in source
     let dest = PathBuf::from(twome.clone().unwrap());
-    let common_prefix = &dest.strip_prefix(&local_prefix);
+    /* 
+    // as per https://github.com/sagrudd/epi4you/issues/1 - ensure that destination is not in source
+    
+    let common_prefix = &dest.strip_prefix(&current_prefix);
     if !common_prefix.is_err() {
         eprintln!("Destination is a child of source - this will not work!");
         return;
     }
-
+    */
     if dest.exists() && !*force {
         eprintln!("destination archive already exists - cannot continue without `--force`")
     } else {
         // tar up the contents specified in the manifest
-        epi2me_tar::tar(dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
+        epi2me_tar::tar(wf_path, dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
     }
 
     // cleanup temporary content ...
@@ -252,14 +276,14 @@ pub fn export_cli_run(ulidstr: &String, source: PathBuf, temp_dir: TempDir, dest
         eprintln!("destination archive already exists - cannot continue without `--force`")
     } else {
         // tar up the contents specified in the manifest
-        epi2me_tar::tar(dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
+        epi2me_tar::tar(None, dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
     }
 
 }
 
 
 
-pub fn export_desktop_run(runids: &Vec<String>, polardb: &DataFrame, destination: Option<PathBuf>, bundlewfs: &Vec<Workflow>) {
+pub fn export_desktop_run(wf_path: Option<&PathBuf>, runids: &Vec<String>, polardb: &DataFrame, destination: Option<PathBuf>, bundlewfs: &Vec<Workflow>) {
     let local_prefix = epi2me_db::find_db().unwrap().epi2path;
     if destination.is_none() {
         eprintln!("error with tarball destination ....");
@@ -314,7 +338,7 @@ pub fn export_desktop_run(runids: &Vec<String>, polardb: &DataFrame, destination
         for wf in bundlewfs {
             println!("bundling [{:?}]", wf);
 
-            let wf_vehicle = get_workflow_vehicle(&wf.project, &wf.name, &wf.version);
+            let wf_vehicle = get_workflow_vehicle(wf_path, &wf.project, &wf.name, &wf.version);
             manifest_note_packaged_workflow(&mut manifest, 
                 &vec![String::from(&wf.project), 
                     String::from( &wf.name), String::from(&wf.version)].join("/"));
@@ -334,7 +358,7 @@ pub fn export_desktop_run(runids: &Vec<String>, polardb: &DataFrame, destination
     write_manifest_str(&manifest, &manifest_pb);
 
     // tar up the contents specified in the manifest
-    epi2me_tar::tar(dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
+    epi2me_tar::tar(wf_path, dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
 }
 
 
@@ -345,6 +369,9 @@ fn clip_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
 }
 
 fn get_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
+
+    println!("relativePath {:?} from lp {:?} ...", e, local_prefix);
+
     PathBuf::from(e.strip_prefix(local_prefix).unwrap())
 }
 
