@@ -253,11 +253,13 @@ async fn export_containers(containers: &Vec<String>, p: &PathBuf) {
     if docker.is_ok() {
         println!("docker is OK");
         for container in containers {
-            println!("exporting [{}]", container);
+            println!("exporting [{}]", &container);
 
-            
             let mut write_path = p.clone();
-            write_path.push(format!("{}.tar", container.clone().replace("/", "-")));
+            let mut tar_file = String::from(container);
+            tar_file = tar_file.replace("/", "-");
+            tar_file = tar_file.replace(":", "-");
+            write_path.push(format!("{}.tar", &tar_file));
 
             println!("writing to file [{}]", write_path.display());
 
@@ -269,7 +271,6 @@ async fn export_containers(containers: &Vec<String>, p: &PathBuf) {
             let file = fs::OpenOptions::new()
             .create(true) // To create a new file
             .write(true)
-            // either use the ? operator or unwrap since it returns a Result
             .open(write_path);
         
             if file.is_ok() {
