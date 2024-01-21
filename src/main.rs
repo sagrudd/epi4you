@@ -66,8 +66,8 @@ enum Datatypes {
     /// containers used by the EPI2ME software
     Docker {
         /// define EPI2ME Desktop analysis
-        #[arg(short, long)]
-        workflow: Option<String>,
+        #[arg(num_args(0..), short, long)]
+        workflow: Vec<String>,
 
         /// List project linked containers
         #[arg(short, long, action=ArgAction::SetTrue)]
@@ -79,7 +79,7 @@ enum Datatypes {
 
         /// Export containers into archive
         #[arg(short, long)]
-        export: Option<String>,
+        twome: Option<String>,
     },
 
     /// EPI2ME workflow results
@@ -200,19 +200,19 @@ enum Datatypes {
 async fn main() {
     let cliargs = Args::parse();
 
-    //let epi2me_opt = epi2me_db::find_db();
-    //if epi2me_opt.is_some() {
-    //    let epi2me = epi2me_opt.unwrap();
-    //    let df = app_db::load_db(&epi2me.epi2db_path);
-    //    if df.is_ok() {
+            let tempdir = tempdir::get_tempdir();
+            if tempdir.is_none() {
+                eprintln!("error creating tempdir - aborting!");
+                return;
+            }
 
             match &cliargs.command {
 
-                Some(Datatypes::Docker { workflow: project, list, pull, export }) => {
+                Some(Datatypes::Docker { workflow: project, list, pull, twome }) => {
                     let epi2me_opt = epi2me_db::find_db();
                     if epi2me_opt.is_some() {
                         let epi2me = epi2me_opt.unwrap();
-                        docker_agent(&epi2me, project, list, pull, export).await;
+                        docker_agent(&tempdir.unwrap(), &epi2me, project, list, pull, twome).await;
                     }
                 },
 

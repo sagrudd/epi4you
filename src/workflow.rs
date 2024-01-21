@@ -66,10 +66,13 @@ fn is_folder_wf_compliant(wffolder: &PathBuf) -> bool {
 }
 
 
-pub fn glob_path_by_wfname(epi2me: &Epi2meSetup, project: &String) -> Option<PathBuf> {
+pub fn glob_path_by_wfname(epi2me: &Epi2meSetup, project: &String, name: &String) -> Option<PathBuf> {
 
-    let globpat = epi2me.epi2wf_dir.clone().into_os_string().into_string().unwrap();
-    let result = [&globpat, "/*/", &project].join("");
+    let mut src = PathBuf::from(&epi2me.epi2wf_dir);
+    src.push(&project);
+
+    let globpat = src.into_os_string().into_string().unwrap();
+    let result = [&globpat, "/", &name].join("");
     
     let gdata =  glob(&result).expect("Failed to read glob pattern");
     for entry in gdata {
@@ -87,7 +90,7 @@ pub fn glob_path_by_wfname(epi2me: &Epi2meSetup, project: &String) -> Option<Pat
 }
 
 
-fn workflows_to_polars(path: &PathBuf) -> Option<DataFrame> {
+pub fn list_installed_workflows(path: &PathBuf) -> Vec<Workflow> {
     println!("\tparsing workflows from path [{:?}]", path);
 
     let globpat = &path.clone().into_os_string().into_string().unwrap();
@@ -130,7 +133,13 @@ fn workflows_to_polars(path: &PathBuf) -> Option<DataFrame> {
             Err(e) => println!("{:?}", e),
         }
     }
+    return wfs;
 
+}
+
+
+fn workflows_to_polars(path: &PathBuf) -> Option<DataFrame> {
+    let wfs = list_installed_workflows(path);
     let df = workflow_vec_to_df(wfs);
     return Some(df);
 

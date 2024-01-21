@@ -1,4 +1,8 @@
 use std::{path::PathBuf, fs, collections::HashMap};
+use crate::dataframe::{docker_vec_to_df, print_polars_df};
+use crate::epi2me_db;
+use crate::tempdir::TempDir;
+use crate::workflow::list_installed_workflows;
 use crate::{epi2me_db::Epi2meSetup, workflow::glob_path_by_wfname};
 use regex::Regex;
 use docker_api::{Docker, Result};
@@ -6,6 +10,7 @@ use docker_api::opts::PullOpts;
 use docker_api::api::Image;
 use docker_api::opts::TagOpts;
 use futures::{StreamExt, TryStreamExt};
+use serde::{Serialize, Deserialize};
 use std::io::Write;
 
 
@@ -288,78 +293,137 @@ async fn export_containers(containers: &Vec<String>, p: &PathBuf) {
     }   
 }
 
-pub async fn docker_agent(epi2me: &Epi2meSetup, workflow_opt: &Option<String>, list: &bool, pull: &bool, export: &Option<String>) {
 
-    if !workflow_opt.is_some() {
+
+
+#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug)]
+pub struct Container {
+    pub workflow: String,
+    pub version: String,
+    pub dockcont: String,
+}
+
+
+fn load_container_contexts(epi2me: &Epi2meSetup) -> Option<Vec<Container>> {
+    println!("Loading container contexts ...");
+
+    let mut docker_content: Vec<Container> = Vec::new();
+
+    // load all EPI2ME installed workflows ...
+    let src_dir = epi2me_db::find_db().unwrap().epi2wf_dir;
+    let wfs = list_installed_workflows(&src_dir);
+    for workflow in wfs {
+        println!("{:?}", workflow);
+        let workflow_id = vec![String::from(&workflow.project), String::from(&workflow.name)].join("/");
+  
+        let containers: Vec<String>;
+        let _nf_config: HashMap<String, String>;
+
+        let epi2me_installed_wf = glob_path_by_wfname(epi2me, &workflow.project, &workflow.name);
+        if epi2me_installed_wf.is_some() {
+            let mut pb = epi2me_installed_wf.unwrap().clone();
+            pb.push("nextflow.config");
+            (_nf_config, containers) = identify_containers(&pb);
+            for container in containers {
+                // println!("container == {}", container);
+                docker_content.push( Container{workflow: String::from(&workflow_id), 
+                    version:String::from(&workflow.version), 
+                    dockcont:container, } )
+            }
+        } else {
+            eprintln!("Unable to parse containers from [{}]", workflow_id);
+            return None;
+        }
+    }
+    return Some(docker_content);
+}
+
+
+pub async fn docker_agent(tempdir: &TempDir, epi2me: &Epi2meSetup, workflow_opt: &Vec<String>, list: &bool, pull: &bool, twome: &Option<String>) {
+
+    if !workflow_opt.len() == 0 {
         println!("docker methods require a --workflow pointer to a workflow");
         return;
     }
-    let workflow = workflow_opt.as_ref().unwrap().to_string();
 
-    println!("surveying workflow [{:?}]", workflow);
-    // println!("data = {:?}", epi2me.epi2path);
-    // println!("arch = {:?}", epi2me.arch);
-    // println!("home = {:?}", epi2me.epi2wf_dir);
-
-    let mut containers: Vec<String> = Vec::new();
-    let mut nf_config: HashMap<String, String> = HashMap::new();
-    let mut valid: bool = false;
-
-    let epi2me_installed_wf = glob_path_by_wfname(epi2me, &workflow);
-    if epi2me_installed_wf.is_some() {
-        let mut pb = epi2me_installed_wf.unwrap().clone();
-        pb.push("nextflow.config");
-        (nf_config, containers) = identify_containers(&pb);
-        valid = true;
-    }
-
-    if !valid {
-        println!("Cannot continue - the --workflow defined cannot be resolved");
+    let docker_content = load_container_contexts(epi2me);
+    if docker_content.is_none() {
+        return;
     }
 
     if *list {
-        for container in &containers {
-            println!("{}", container);
+        println!("Make container vec pretty ...");
+        let df = docker_vec_to_df(docker_content.unwrap());
+        print_polars_df(&df);
+    }
+
+
+    /* 
+
+    for workflow in workflow_opt {
+
+        println!("surveying workflow [{:?}]", workflow);
+        // println!("data = {:?}", epi2me.epi2path);
+        // println!("arch = {:?}", epi2me.arch);
+        // println!("home = {:?}", epi2me.epi2wf_dir);
+
+        let mut containers: Vec<String> = Vec::new();
+        let mut nf_config: HashMap<String, String> = HashMap::new();
+        let mut valid: bool = false;
+
+        let epi2me_installed_wf = glob_path_by_wfname(epi2me, &workflow);
+        if epi2me_installed_wf.is_some() {
+            let mut pb = epi2me_installed_wf.unwrap().clone();
+            pb.push("nextflow.config");
+            (nf_config, containers) = identify_containers(&pb);
+            valid = true;
         }
-    }
 
-    if *pull {
-            for container in &containers {
-                println!("pulling [{}]", container);
-                pull_container(container).await;
-            }
-    }
+        if !valid {
+            println!("Cannot continue - the --workflow defined cannot be resolved");
+        }
 
-    if export.is_some() {
-        let export_path = export.clone().unwrap();
-        // is export path an existing folder?
-        let mut p = PathBuf::from(&export_path);
-        if !p.exists() {
-            eprintln!("export path [{export_path}] does not exist");
-            return;
-        } else if p.is_file() {
-            eprintln!("export path [{export_path}] is a file; folder required");
-            return;
-        } else {
-            let arch = String::from(std::env::consts::ARCH);
-            let version = nf_config.get("manifest.version").unwrap();
-            let folder = vec![workflow, version.clone(), arch].join(".");
-            println!("creating object = {folder}");
 
-            p.push(folder);
 
-            if !p.exists() {
-                let state = fs::create_dir(&p);
-                if state.is_err() {
-                    eprintln!("failed to create folder {:?}", p);
-                    return;
+        if *pull {
+                for container in &containers {
+                    println!("pulling [{}]", container);
+                    pull_container(container).await;
                 }
-            }
-            
-            export_containers(&containers, &p).await;
         }
 
-    }
+        if export.is_some() {
+            let export_path = export.clone().unwrap();
+            // is export path an existing folder?
+            let mut p = PathBuf::from(&export_path);
+            if !p.exists() {
+                eprintln!("export path [{export_path}] does not exist");
+                return;
+            } else if p.is_file() {
+                eprintln!("export path [{export_path}] is a file; folder required");
+                return;
+            } else {
+                let arch = String::from(std::env::consts::ARCH);
+                let version = nf_config.get("manifest.version").unwrap();
+                let folder = vec![workflow, version.clone(), arch].join(".");
+                println!("creating object = {folder}");
 
+                p.push(folder);
+
+                if !p.exists() {
+                    let state = fs::create_dir(&p);
+                    if state.is_err() {
+                        eprintln!("failed to create folder {:?}", p);
+                        return;
+                    }
+                }
+                
+                export_containers(&containers, &p).await;
+            }
+
+        }
+
+    } */
 
 }
