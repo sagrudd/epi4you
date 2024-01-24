@@ -1,5 +1,6 @@
+use std::process::Command;
 use std::{path::PathBuf, fs, collections::HashMap};
-use crate::dataframe::{docker_vec_to_df, print_polars_df};
+use crate::dataframe::{docker_vec_to_df, print_polars_df, dockercontainer_vec_to_df};
 use crate::epi2me_db;
 use crate::tempdir::TempDir;
 use crate::workflow::list_installed_workflows;
@@ -302,7 +303,58 @@ pub struct Container {
     pub workflow: String,
     pub version: String,
     pub dockcont: String,
+    
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug)]
+pub struct DockerContainer {
+    pub repository: String,                          
+    pub tag: String,                           
+    pub image: String,
+    pub created: String,    
+    pub size: String,
+}
+
+fn load_installed_docker_artifacts() {
+    let mut containers: Vec<DockerContainer> = Vec::new();
+    let output = Command::new("docker")
+    .arg("images")
+    .output()
+    .expect("failed to execute process");
+
+    let s = String::from_utf8_lossy(&output.stdout).into_owned();
+    let trimmed_s = s.trim();
+
+    let lines = trimmed_s.lines();
+        for line in lines {
+            if !line.starts_with("REPOSITORY") {
+            let mut mod_container_str = String::from(line);
+            let re = Regex::new(r"\s\s+").unwrap(); // 
+                
+            for matched in re.find_iter(&String::from(line)) {
+                let found = matched.as_str();
+                mod_container_str = mod_container_str.replace(found, "|");
+            }
+            let split_str: Vec<&str> = mod_container_str.split("|").collect();
+
+            //println!("{mod_container_str}");
+            let db = DockerContainer {
+                repository: String::from(split_str.get(0).unwrap().to_owned()),                          
+                tag: String::from(split_str.get(1).unwrap().to_owned()),                           
+                image: String::from(split_str.get(2).unwrap().to_owned()),
+                created: String::from(split_str.get(3).unwrap().to_owned()),    
+                size: String::from(split_str.get(4).unwrap().to_owned())
+            };
+            containers.push(db);
+            
+        }
+    }
+
+    let dbdf = dockercontainer_vec_to_df(containers.clone());
+    print_polars_df(&dbdf);
+}
+
 
 
 fn load_container_contexts(epi2me: &Epi2meSetup) -> Option<Vec<Container>> {
@@ -313,8 +365,11 @@ fn load_container_contexts(epi2me: &Epi2meSetup) -> Option<Vec<Container>> {
     // load all EPI2ME installed workflows ...
     let src_dir = epi2me_db::find_db().unwrap().epi2wf_dir;
     let wfs = list_installed_workflows(&src_dir);
+
+    load_installed_docker_artifacts();
+
     for workflow in wfs {
-        println!("{:?}", workflow);
+        //println!("{:?}", workflow);
         let workflow_id = vec![String::from(&workflow.project), String::from(&workflow.name)].join("/");
   
         let containers: Vec<String>;
@@ -340,9 +395,9 @@ fn load_container_contexts(epi2me: &Epi2meSetup) -> Option<Vec<Container>> {
 }
 
 
-pub async fn docker_agent(tempdir: &TempDir, epi2me: &Epi2meSetup, workflow_opt: &Vec<String>, list: &bool, pull: &bool, twome: &Option<String>) {
+pub async fn docker_agent(tempdir: &TempDir, epi2me: &Epi2meSetup, workflows: &Vec<String>, list: &bool, pull: &bool, twome: &Option<String>) {
 
-    if !workflow_opt.len() == 0 {
+    if !workflows.len() == 0 {
         println!("docker methods require a --workflow pointer to a workflow");
         return;
     }
@@ -354,11 +409,31 @@ pub async fn docker_agent(tempdir: &TempDir, epi2me: &Epi2meSetup, workflow_opt:
 
     if *list {
         println!("Make container vec pretty ...");
-        let df = docker_vec_to_df(docker_content.unwrap());
+        let df = docker_vec_to_df(docker_content.clone().unwrap());
         print_polars_df(&df);
+        return;
     }
 
+    // sanity check the specified workflows ...
+    for workflow in workflows {
+        let mut found: bool = false;
+        for containerc in docker_content.clone().unwrap() {
+            if workflow.to_string().eq(&containerc.workflow) {
+                found = true;
+            }
+        }
+        if !found {
+            eprintln!("specified workflow [{}] not found", workflow);
+            return;
+        }
+    }
 
+    // create a manifest
+
+    // export the files ...
+    for workflow in workflows {
+
+    }
     /* 
 
     for workflow in workflow_opt {

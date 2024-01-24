@@ -3,7 +3,7 @@ use std::env;
 use polars_core::prelude::*;
 use polars::prelude::*;
 
-use crate::{workflow::Workflow, app_db::Epi2MeAnalysis, nextflow::{NxfLogItem, NextflowAssetWorkflow}, docker::Container};
+use crate::{workflow::Workflow, app_db::Epi2MeAnalysis, nextflow::{NxfLogItem, NextflowAssetWorkflow}, docker::{Container, DockerContainer}};
 
 
 #[macro_export]
@@ -34,6 +34,15 @@ pub fn docker_vec_to_df(wfs: Vec<Container>) -> DataFrame {
     struct_to_dataframe!(wfs, [workflow,
         version,
         dockcont]).unwrap()
+}
+
+
+pub fn dockercontainer_vec_to_df(wfs: Vec<DockerContainer>) -> DataFrame {
+    struct_to_dataframe!(wfs, [repository,                          
+        tag,                           
+        image,
+        created,    
+        size]).unwrap()
 }
 
 
