@@ -134,12 +134,48 @@ fn identify_containers(pb: &PathBuf) -> (HashMap<String, String>, Vec<String>) {
     return (config.clone(), extract_containers(&config.clone()));
 }
 
+
+fn get_docker_context_socket() -> String {
+    let output = Command::new("docker")
+        .arg("context")
+        .arg("ls")
+        .output()
+        .expect("failed to execute process");
+
+    let s = String::from_utf8_lossy(&output.stdout).into_owned();
+    let trimmed_s = s.trim();
+
+    let lines = trimmed_s.lines();
+    for line in lines {
+        if !line.trim().starts_with("NAME") {
+            // println!("{line}");
+            let re = Regex::new(r"\s{2,50}").unwrap(); // 
+            let mut mod_container_str = String::from(line.trim()).replace("\t", "");
+            for matched in re.find_iter(&String::from(line)) {
+                let found = matched.as_str();
+                mod_container_str = mod_container_str.replacen(found, "|", 1);
+            }
+            // println!("{}", mod_container_str);
+            let split_str: Vec<&str> = mod_container_str.split("|").collect();
+            let socket_name = split_str.get(0).unwrap().to_owned();
+            let socket = split_str.get(3).unwrap().to_owned();
+            // println!("socket [{}] == <{}>", socket_name, socket);
+            if socket_name.ends_with("*") {
+                return String::from(socket).replace("unix://", "");
+            }
+        }
+    }
+    return String::from("/var/run/docker.sock");
+}
+
+
 pub fn new_docker() -> Result<Docker> {
 
     // we should parse connection strings via -  `docker context ls`
+    let socket = get_docker_context_socket();
 
     //Ok(Docker::unix("/var/run/docker.sock"))
-    Ok(Docker::unix("/Users/stephen.rudd/.docker/run/docker.sock"))
+    Ok(Docker::unix(socket))
 }
 
 
