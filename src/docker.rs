@@ -1,9 +1,10 @@
 use std::process::Command;
 use std::{path::PathBuf, fs, collections::HashMap};
-use crate::bundle::{clip_relative_path, sha256_digest};
+use crate::bundle::{clip_relative_path, sha256_digest, sha256_str_digest, get_relative_path};
 use crate::dataframe::{docker_vec_to_df, print_polars_df, dockercontainer_vec_to_df};
-use crate::epi2me_db;
-use crate::manifest::{get_manifest, FileManifest, Epi2meContainer, file_manifest_size, Epi2MeContent};
+use crate::{epi2me_db, epi2me_tar};
+use crate::json::{get_manifest_str, write_manifest_str};
+use crate::manifest::{get_manifest, FileManifest, Epi2meContainer, file_manifest_size, Epi2MeContent, MANIFEST_JSON};
 use crate::tempdir::TempDir;
 use crate::workflow::list_installed_workflows;
 use crate::{epi2me_db::Epi2meSetup, workflow::glob_path_by_wfname};
@@ -312,7 +313,8 @@ async fn export_containers(containers: &Vec<String>, p: &PathBuf) -> Vec<FileMan
             let mut tar_file = String::from(container);
             tar_file = tar_file.replace("/", "-");
             tar_file = tar_file.replace(":", "-");
-            write_path.push(format!("{}.tar", &tar_file));
+            tar_file = format!("{}.tar", &tar_file);
+            write_path.push(&tar_file);
 
             println!("writing to file [{}]", write_path.display());
 
@@ -551,11 +553,33 @@ pub async fn docker_agent(tempdir: &TempDir, epi2me: &Epi2meSetup, workflows: &V
             manifest.files_size += file_manifest_size(&e.files);
             manifest.payload.push( Epi2MeContent::Epi2meContainer(e.clone()) ); 
 
-            // and prepare the bundle ...
+            
         }
 
     }
 
+    // and prepare the bundle ...
+    let manifest_signature = sha256_str_digest(get_manifest_str(&manifest).as_str());
+    manifest.signature = manifest_signature;
+
+    let mut manifest_pb = PathBuf::from(&tempdir.path);
+    manifest_pb.push(MANIFEST_JSON);
+    write_manifest_str(&manifest, &manifest_pb);
+
+    let dest = PathBuf::from(&twome.clone().unwrap());
+
     println!("manifest -> {:?}", manifest);
+
+    let force: bool = false;
+
+    // tar up the contents specified in the manifest
+    if dest.exists() && !force {
+        eprintln!("destination archive already exists - cannot continue without `--force`")
+    } else {
+        // tar up the contents specified in the manifest
+        let local_prefix = epi2me_db::find_db().unwrap().epi2path;
+        println!("creating tar file ...");
+        epi2me_tar::tar(None, dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
+    }
 
 }

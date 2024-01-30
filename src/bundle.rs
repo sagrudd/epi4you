@@ -368,7 +368,7 @@ pub fn clip_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
     return relative_path;
 }
 
-fn get_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
+pub fn get_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
     //println!("relativePath {:?} from lp {:?} ...", e, local_prefix);
     PathBuf::from(e.strip_prefix(local_prefix).unwrap())
 }
