@@ -66,6 +66,17 @@ impl Default for Epi2meDesktopAnalysis {
 #[derive(Serialize, Deserialize)]
 #[derive(Clone)]
 #[derive(Debug)]
+pub struct Epi2meContainer {
+    pub workflow: String,
+    pub version: String,
+    pub architecture: String,
+    pub files: Vec<FileManifest>,
+}
+
+
+#[derive(Serialize, Deserialize)]
+#[derive(Clone)]
+#[derive(Debug)]
 #[allow(non_snake_case)]
 pub struct Epi2meWorkflow {
     pub project: String,
@@ -94,6 +105,7 @@ impl Default for Epi2meWorkflow {
 pub enum Epi2MeContent {
     Epi2mePayload(Epi2meDesktopAnalysis),
     Epi2meWf(Epi2meWorkflow),
+    Epi2meContainer(Epi2meContainer),
   }
 
 
@@ -295,6 +307,10 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf, _force: &b
                     // if we are here then the manifest specified files are present and coherent; we're good to go ...
                     successful_content.push(cfile.clone());
                 },
+
+                Epi2MeContent::Epi2meContainer(epi2me_container) => {
+                    println!("Epi2meContainer");
+                }
                 
             }
         }
@@ -318,6 +334,11 @@ pub fn import_resolved_content(content: &Vec<Epi2MeContent>, force: &bool) {
             Epi2MeContent::Epi2mePayload(desktop_analysis) => {
                 println!("importing DesktopAnalysis[{}]", &desktop_analysis.id);
                 insert_untarred_desktop_analysis(desktop_analysis);
+            },
+
+
+            Epi2MeContent::Epi2meContainer(epi2me_container) => {
+                println!("importing Epi2meContainer");
             },
         }
     }

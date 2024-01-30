@@ -1,8 +1,9 @@
 use std::process::Command;
 use std::{path::PathBuf, fs, collections::HashMap};
+use crate::bundle::{clip_relative_path, sha256_digest};
 use crate::dataframe::{docker_vec_to_df, print_polars_df, dockercontainer_vec_to_df};
 use crate::epi2me_db;
-use crate::manifest::{get_manifest, FileManifest};
+use crate::manifest::{get_manifest, FileManifest, Epi2meContainer, file_manifest_size, Epi2MeContent};
 use crate::tempdir::TempDir;
 use crate::workflow::list_installed_workflows;
 use crate::{epi2me_db::Epi2meSetup, workflow::glob_path_by_wfname};
@@ -296,9 +297,11 @@ fn omatch(key: &str, txt: &str) -> Option<String> {
     return None;
 }
 
-async fn export_containers(containers: &Vec<String>, p: &PathBuf) {
+async fn export_containers(containers: &Vec<String>, p: &PathBuf) -> Vec<FileManifest> {
 
     let docker = new_docker();
+    let local_prefix = epi2me_db::find_db().unwrap().epi2path;
+    let mut files: Vec<FileManifest> = Vec::new(); 
         
     if docker.is_ok() {
         println!("docker is OK");
@@ -321,13 +324,24 @@ async fn export_containers(containers: &Vec<String>, p: &PathBuf) {
             let file = fs::OpenOptions::new()
             .create(true) // To create a new file
             .write(true)
-            .open(write_path);
+            .open(&write_path);
         
             if file.is_ok() {
                 println!("file is OK!");
                 let xxx = file.unwrap().write_all(&export_data);
                 if xxx.is_err() {
                     eprintln!("{:?}", xxx.err());
+                } else {
+
+                    let relative_path = clip_relative_path(&write_path, &local_prefix);
+                    let file_size = &write_path.metadata().unwrap().len();
+                    let checksum = sha256_digest(&write_path.as_os_str().to_str().unwrap());
+
+                    files.push( FileManifest{filename: tar_file,
+                        relative_path: String::from(relative_path.clone().to_string_lossy().to_string()),
+                        size: *file_size,
+                        md5sum: checksum
+                    } );
                 }
             } else {
                 eprintln!("file is fubar\n{:?}", file.err());
@@ -336,6 +350,7 @@ async fn export_containers(containers: &Vec<String>, p: &PathBuf) {
 
 
     }   
+    return files;
 }
 
 
@@ -458,6 +473,11 @@ pub async fn docker_agent(tempdir: &TempDir, epi2me: &Epi2meSetup, workflows: &V
         return;
     }
 
+    if twome.is_none() {
+        eprintln!("requires a --twome path - please try again");
+        return;
+    }
+
     // sanity check the specified workflows ...
     for workflow in workflows {
         let mut found: bool = false;
@@ -505,7 +525,7 @@ pub async fn docker_agent(tempdir: &TempDir, epi2me: &Epi2meSetup, workflows: &V
             return;
         } else {
             let arch = String::from(std::env::consts::ARCH);
-            let folder = vec![String::from(workflow), version, arch].join(".");
+            let folder = vec![String::from(workflow), String::from(&version), String::from(&arch)].join(".");
             println!("creating object = {folder}");
             p.push(folder);
 
@@ -516,19 +536,26 @@ pub async fn docker_agent(tempdir: &TempDir, epi2me: &Epi2meSetup, workflows: &V
                     return;
                 }
             }
-            export_containers(&containers, &p).await;
+            let files = export_containers(&containers, &p).await;
+            // println!("files == [{:?}]", files);
+
+            let e: Epi2meContainer = Epi2meContainer{ 
+                workflow: workflow.to_owned(),
+                version: String::from(&version),
+                architecture: String::from(&arch),
+                files: files
+            };
+            // println!("e == {:?}", e);
+            all_files.extend(e.files.clone());
+            manifest.filecount += u64::try_from(e.files.len()).unwrap();
+            manifest.files_size += file_manifest_size(&e.files);
+            manifest.payload.push( Epi2MeContent::Epi2meContainer(e.clone()) ); 
+
+            // and prepare the bundle ...
         }
 
     }
 
-    /* 
-            let export_path = export.clone().unwrap();
-            // is export path an existing folder?
-            let mut p = PathBuf::from(&export_path);
-            
-
-        }
-
-    } */
+    println!("manifest -> {:?}", manifest);
 
 }

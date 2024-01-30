@@ -38,6 +38,10 @@ pub fn import_manager(twome: &Option<String>, force: &bool) {
                             }
                         }
                     },
+
+                    Epi2MeContent::Epi2meContainer(epi2me_container) => {
+                        println!("importing Epi2meContainer");
+                    },
                     
                 }
 

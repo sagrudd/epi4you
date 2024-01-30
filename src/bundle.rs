@@ -362,7 +362,7 @@ pub fn export_desktop_run(wf_path: Option<&PathBuf>, runids: &Vec<String>, polar
 }
 
 
-fn clip_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
+pub fn clip_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
     let mut relative_path = get_relative_path(e, local_prefix);
     let _ = relative_path.pop();
     return relative_path;
