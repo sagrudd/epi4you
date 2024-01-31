@@ -1,3 +1,4 @@
+use std::fs::File;
 use std::process::Command;
 use std::{path::PathBuf, fs, collections::HashMap};
 use crate::bundle::{clip_relative_path, sha256_digest, sha256_str_digest, get_relative_path};
@@ -297,6 +298,43 @@ fn omatch(key: &str, txt: &str) -> Option<String> {
     println!("returning None!");
     return None;
 }
+
+
+pub async fn insert_untarred_containers(epi2me_container: &Epi2meContainer) {
+    println!("importing Epi2meContainer");
+    let docker = new_docker();
+    let local_prefix = epi2me_db::find_db().unwrap().epi2path;
+    let files = &epi2me_container.files;
+    for file in files {
+        println!("importing container [{:?}] from [{:?}]", &file.filename, &file.relative_path);
+
+        let mut src = local_prefix.clone();
+        src.push("import_export_4you");
+        src.push(&file.relative_path);
+        src.push(&file.filename);
+
+        if src.exists() {
+            println!("file exists ...");
+
+            let images = docker.clone().unwrap().images();
+
+            let f = File::open(src).expect("Unable to open file");
+            let reader = Box::from(f);
+            let mut stream = images.import(reader);
+
+            while let Some(import_result) = stream.next().await {
+                match import_result {
+                    Ok(output) => println!("{output:?}"),
+                    Err(e) => eprintln!("Error: {e}"),
+                }
+            }
+
+            
+        } 
+    }
+}
+
+
 
 async fn export_containers(containers: &Vec<String>, p: &PathBuf) -> Vec<FileManifest> {
 

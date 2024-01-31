@@ -1,10 +1,10 @@
-use std::{path::PathBuf, collections::HashMap};
+use std::path::PathBuf;
 
-use crate::{manifest::{load_manifest_from_tarball, Epi2MeContent, is_manifest_honest, import_resolved_content}, tempdir::{TempDir, get_named_tempdir}};
+use crate::manifest::{load_manifest_from_tarball, is_manifest_honest, import_resolved_content};
 
 
 
-pub fn import_manager(twome: &Option<String>, force: &bool) {
+pub async fn import_manager(twome: &Option<String>, force: &bool) {
 
     if twome.is_none() {
         eprintln!("EPI2ME twome import requires a --twome <file> target to read");
@@ -14,6 +14,8 @@ pub fn import_manager(twome: &Option<String>, force: &bool) {
         let manifest = load_manifest_from_tarball(&path);
 
         if manifest.is_some() {
+
+            /* 
 
             let mut content: HashMap<String, TempDir> = HashMap::new();
 
@@ -41,11 +43,19 @@ pub fn import_manager(twome: &Option<String>, force: &bool) {
 
                     Epi2MeContent::Epi2meContainer(epi2me_container) => {
                         println!("importing Epi2meContainer");
+                        let files = &epi2me_container.files;
+                        for file in files {
+                            if !content.contains_key(&file.relative_path) {
+                                content.insert(file.relative_path.to_owned(), get_named_tempdir(&file.relative_path).unwrap());
+                            }
+                        }
                     },
                     
                 }
 
             }
+
+            */
 
             let honest = is_manifest_honest(&manifest.unwrap(), &path, force);
             if honest.is_none() {
@@ -53,7 +63,7 @@ pub fn import_manager(twome: &Option<String>, force: &bool) {
                 return;
             } if honest.is_some() {
                 println!("importing something");
-                import_resolved_content(&honest.unwrap(), force);
+                import_resolved_content(&honest.unwrap(), force).await;
             }
 
             

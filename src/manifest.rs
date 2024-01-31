@@ -1,7 +1,7 @@
 use std::{path::PathBuf, fs::File, io::Read};
 use tar::Archive;
 use serde::{Serialize, Deserialize};
-use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::{sha256_str_digest, sha256_digest}, epi2me_tar::untar, app_db::insert_untarred_desktop_analysis, workflow::insert_untarred_workflow};
+use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::{sha256_str_digest, sha256_digest}, epi2me_tar::untar, app_db::insert_untarred_desktop_analysis, workflow::insert_untarred_workflow, docker::insert_untarred_containers};
 
 pub static MANIFEST_JSON: &str = "4u_manifest.json";
 
@@ -310,6 +310,13 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf, _force: &b
 
                 Epi2MeContent::Epi2meContainer(epi2me_container) => {
                     println!("Epi2meContainer");
+                    let x = validate_manifest_files(&epi2me_container.files);
+                    if x.is_none() {
+                        eprintln!("failed to validate the analysis manifest files - quitting");
+                        return None;
+                    }
+                    // if we are here then the manifest specified files are present and coherent; we're good to go ...
+                    successful_content.push(cfile.clone());
                 }
                 
             }
@@ -320,7 +327,7 @@ pub fn is_manifest_honest(manifest: &Epi2MeManifest, twome: &PathBuf, _force: &b
 }
 
 
-pub fn import_resolved_content(content: &Vec<Epi2MeContent>, force: &bool) {
+pub async fn import_resolved_content(content: &Vec<Epi2MeContent>, force: &bool) {
     println!("import_resolved_content");
     for cfile in content {
         println!("cfile instance ...");
@@ -339,6 +346,7 @@ pub fn import_resolved_content(content: &Vec<Epi2MeContent>, force: &bool) {
 
             Epi2MeContent::Epi2meContainer(epi2me_container) => {
                 println!("importing Epi2meContainer");
+                insert_untarred_containers(epi2me_container).await;
             },
         }
     }

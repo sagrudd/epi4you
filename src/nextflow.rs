@@ -761,6 +761,8 @@ fn get_workflow_entity(key: &String, extant_artifacts: &Vec<NextflowAssetWorkflo
 }
 
 
+
+
 pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &Option<String>, pull: &bool, twome: &Option<String>, force: &bool, docker: &bool) {
     let nextflow_bin = get_nextflow_path(nxf_bin.clone());
     if nextflow_bin.is_some() {

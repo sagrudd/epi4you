@@ -251,7 +251,7 @@ async fn main() {
                 },
 
                 Some(Datatypes::Import { twome, force}) => {
-                    import_manager(twome, force);
+                    import_manager(twome, force).await;
                 },
 
                 None => {}
