@@ -21,7 +21,7 @@ pub fn get_named_tempdir(temp_subdir: &String) -> Option<TempDir> {
     let epi2medb = find_db();
     let mut epi4you_path = env::temp_dir();
     if epi2medb.is_some() {
-        epi4you_path = find_db().unwrap().epi4you_path;
+        epi4you_path = epi2medb.unwrap().epi4you_path;
     } 
     epi4you_path.push(temp_subdir);
     return form_tempdir(epi4you_path);

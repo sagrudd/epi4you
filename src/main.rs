@@ -1,6 +1,5 @@
 use app_db::dbmanager;
 use clap::{Parser, Subcommand, ArgAction};
-use docker::docker_agent;
 use epi2me_db::epi2me_manager;
 use importer::import_manager;
 use workflow::workflow_manager;
@@ -19,6 +18,10 @@ mod provenance;
 mod tempdir;
 mod workflow;
 mod settings;
+
+mod xdocker;
+mod xnf_parser;
+mod xworkflows;
 
 /// Trivial application to package EPI2ME workflows and analysis results
 #[derive(Parser)]
@@ -200,61 +203,62 @@ enum Datatypes {
 async fn main() {
     let cliargs = Args::parse();
 
-            let tempdir = tempdir::get_tempdir();
-            if tempdir.is_none() {
-                eprintln!("error creating tempdir - aborting!");
-                return;
+    let tempdir = tempdir::get_tempdir();
+    if tempdir.is_none() {
+        eprintln!("error creating tempdir - aborting!");
+        return;
+    }
+
+    match &cliargs.command {
+
+        Some(Datatypes::Docker { workflow: project, list, pull, twome }) => {
+            //let epi2me_opt = epi2me_db::find_db();
+            // if epi2me_opt.is_some() {
+                //let epi2me = epi2me_opt.unwrap();
+                //docker::docker_agent(&tempdir.unwrap(), &epi2me, project, list, pull, twome).await;
+                xdocker::docker_agent(&tempdir.unwrap(), project, list, pull, twome);
+            //}
+        },
+
+        Some(Datatypes::Database { list, runid, status, delete, rename, housekeeping, clone }) => {
+            let epi2me_opt = epi2me_db::find_db();
+            if epi2me_opt.is_some() {
+                let epi2me = epi2me_opt.unwrap();
+                let df = app_db::load_db(&epi2me.epi2db_path);
+                if df.is_ok() {
+                    dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename, housekeeping, clone);
+                }
             }
+        },
 
-            match &cliargs.command {
+        Some(Datatypes::Workflow { list, workflow, twome, force }) => {
+            workflow_manager(list, workflow, twome, force);
+        },
 
-                Some(Datatypes::Docker { workflow: project, list, pull, twome }) => {
-                    let epi2me_opt = epi2me_db::find_db();
-                    if epi2me_opt.is_some() {
-                        let epi2me = epi2me_opt.unwrap();
-                        docker_agent(&tempdir.unwrap(), &epi2me, project, list, pull, twome).await;
-                    }
-                },
+        Some(Datatypes::NextflowArtifact { list, workflow, nxf_bin, pull, twome, force, docker }) => {
+            nextflow::nextflow_artifact_manager(list, workflow, nxf_bin, pull, twome, force, docker);
+        },
 
-                Some(Datatypes::Database { list, runid, status, delete, rename, housekeeping, clone }) => {
-                    let epi2me_opt = epi2me_db::find_db();
-                    if epi2me_opt.is_some() {
-                        let epi2me = epi2me_opt.unwrap();
-                        let df = app_db::load_db(&epi2me.epi2db_path);
-                        if df.is_ok() {
-                            dbmanager(&epi2me.epi2db_path, &df.unwrap(), list, runid, status, delete, rename, housekeeping, clone);
-                        }
-                    }
-                },
+        Some(Datatypes::NextflowRun { list, nxf_bin, nxf_work, runid, twome, force }) => {
+            nextflow::nextflow_run_manager(list, nxf_bin, nxf_work, runid, twome, force);
+        },
 
-                Some(Datatypes::Workflow { list, workflow, twome, force }) => {
-                    workflow_manager(list, workflow, twome, force);
-                },
-
-                Some(Datatypes::NextflowArtifact { list, workflow, nxf_bin, pull, twome, force, docker }) => {
-                    nextflow::nextflow_artifact_manager(list, workflow, nxf_bin, pull, twome, force, docker);
-                },
-
-                Some(Datatypes::NextflowRun { list, nxf_bin, nxf_work, runid, twome, force }) => {
-                    nextflow::nextflow_run_manager(list, nxf_bin, nxf_work, runid, twome, force);
-                },
-
-                Some(Datatypes::EPI2ME { list, bundlewf, runid, twome, force }) => {
-                    let epi2me_opt = epi2me_db::find_db();
-                    if epi2me_opt.is_some() {
-                        let epi2me = epi2me_opt.unwrap();
-                        let df = app_db::load_db(&epi2me.epi2db_path);
-                        if df.is_ok() {
-                            epi2me_manager(&epi2me, &df.unwrap(), list, runid, twome, force, bundlewf);
-                        }
-                    }
-                },
-
-                Some(Datatypes::Import { twome, force}) => {
-                    import_manager(twome, force).await;
-                },
-
-                None => {}
+        Some(Datatypes::EPI2ME { list, bundlewf, runid, twome, force }) => {
+            let epi2me_opt = epi2me_db::find_db();
+            if epi2me_opt.is_some() {
+                let epi2me = epi2me_opt.unwrap();
+                let df = app_db::load_db(&epi2me.epi2db_path);
+                if df.is_ok() {
+                    epi2me_manager(&epi2me, &df.unwrap(), list, runid, twome, force, bundlewf);
+                }
             }
-    
+        },
+
+        Some(Datatypes::Import { twome, force}) => {
+            import_manager(twome, force).await;
+        },
+
+        None => {}
+    }
+
 }

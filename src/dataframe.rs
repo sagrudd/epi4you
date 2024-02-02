@@ -1,8 +1,6 @@
 use std::env;
-
 use polars_core::prelude::*;
 use polars::prelude::*;
-
 use crate::{workflow::Workflow, app_db::Epi2MeAnalysis, nextflow::{NxfLogItem, NextflowAssetWorkflow}, docker::{Container, DockerContainer}};
 
 
@@ -16,12 +14,15 @@ macro_rules! struct_to_dataframe {
             for e in $input.into_iter() {
                 $($field.push(e.$field);)*
             }
-            df! {
+            polars_core::df! {
                 $(stringify!($field) => $field,)*
             }
         }
     };
 }
+
+
+
 
 pub fn workflow_vec_to_df(wfs: Vec<Workflow>) -> DataFrame {
     struct_to_dataframe!(wfs, [project,

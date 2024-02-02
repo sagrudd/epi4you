@@ -2,9 +2,12 @@ use std::{path::{PathBuf, Path}, fs::{self}, env};
 use home;
 use path_clean::PathClean;
 use polars_core::frame::DataFrame;
+use serde::{Serialize, Deserialize};
 use crate::{json, workflow::{self, Workflow}, app_db, bundle};
 
 
+#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug)]
 pub struct Epi2meSetup {
     pub epi2path: PathBuf,
     pub epi2db_path: PathBuf,

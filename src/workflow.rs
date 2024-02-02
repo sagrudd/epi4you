@@ -72,7 +72,7 @@ pub fn glob_path_by_wfname(epi2me: &Epi2meSetup, project: &String, name: &String
     src.push(&project);
 
     let globpat = src.into_os_string().into_string().unwrap();
-    let result = [&globpat, "/", &name].join("");
+    let result = [&globpat, "/*", &name].join("");
     
     let gdata =  glob(&result).expect("Failed to read glob pattern");
     for entry in gdata {
