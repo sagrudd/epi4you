@@ -38,7 +38,7 @@ pub async fn import_coordinator(temp_dir: &PathBuf, twome: &Option<String>, forc
                 },
 
                 Epi2MeContent::Epi2meContainer(epi2me_container) => {
-                    let x = crate::xdocker::Epi2meDocker::from_epi2me_container(epi2me_container, temp_dir).await;
+                    let _x = crate::docker::Epi2meDocker::from_epi2me_container(epi2me_container, temp_dir).await;
                 },
                 
             }

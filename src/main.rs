@@ -17,7 +17,7 @@ mod tempdir;
 mod workflow;
 mod settings;
 
-mod xdocker;
+mod docker;
 mod ximporter;
 mod xmanifest;
 mod xnf_parser;
@@ -216,7 +216,7 @@ async fn main() {
             // if epi2me_opt.is_some() {
                 //let epi2me = epi2me_opt.unwrap();
                 //docker::docker_agent(&tempdir.unwrap(), &epi2me, project, list, pull, twome).await;
-                xdocker::docker_agent(&tempdir.unwrap(), project, list, pull, twome).await;
+                docker::docker_agent(&tempdir.unwrap(), project, list, pull, twome).await;
             //}
         },
 
