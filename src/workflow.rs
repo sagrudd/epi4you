@@ -2,7 +2,7 @@ use std::{path::PathBuf, fs};
 use glob::glob;
 use polars_core::prelude::DataFrame;
 use serde::{Serialize, Deserialize};
-use crate::{epi2me_db::{Epi2meSetup, self}, docker::nextflow_parser, dataframe::{workflow_vec_to_df, print_polars_df, two_field_filter}, bundle::export_nf_workflow, manifest::Epi2meWorkflow};
+use crate::{epi2me_db::{Epi2meSetup, self}, dataframe::{workflow_vec_to_df, print_polars_df, two_field_filter}, bundle::export_nf_workflow, manifest::Epi2meWorkflow};
 
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -113,7 +113,7 @@ pub fn list_installed_workflows(path: &PathBuf) -> Vec<Workflow> {
                     // this is probably best prepared by parsing the information from the config file?
                     if config_path.exists() {
                         let contents = fs::read_to_string(&config_path).unwrap();
-                        let config = nextflow_parser(&contents);
+                        let config = crate::xnf_parser::nextflow_parser(&contents);
                         let mut version = String::from("?");
                         let man_version = config.get("manifest.version");
                         if man_version.is_some() {

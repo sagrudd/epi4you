@@ -1,7 +1,7 @@
 use std::{path::PathBuf, fs::File, io::Read};
 use tar::Archive;
 use serde::{Serialize, Deserialize};
-use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::{sha256_str_digest, sha256_digest}, epi2me_tar::untar, app_db::insert_untarred_desktop_analysis, workflow::insert_untarred_workflow, docker::insert_untarred_containers};
+use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::{sha256_str_digest, sha256_digest}, epi2me_tar::untar, app_db::insert_untarred_desktop_analysis, workflow::insert_untarred_workflow};
 
 pub static MANIFEST_JSON: &str = "4u_manifest.json";
 
@@ -345,8 +345,7 @@ pub async fn import_resolved_content(content: &Vec<Epi2MeContent>, force: &bool)
 
 
             Epi2MeContent::Epi2meContainer(epi2me_container) => {
-                println!("importing Epi2meContainer");
-                insert_untarred_containers(epi2me_container).await;
+                println!("deprecated Epi2meContainer");
             },
         }
     }

@@ -7,7 +7,6 @@ mod app_db;
 mod bundle;
 mod epi2me_db;
 mod epi2me_tar;
-mod docker;
 mod dataframe;
 mod importer;
 mod json;

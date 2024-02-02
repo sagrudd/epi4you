@@ -14,7 +14,6 @@ use serde::ser::SerializeMap;
 
 use crate::bundle::export_nf_workflow;
 use crate::dataframe::{nf_wf_vec_to_df, workflow_vec_to_df};
-use crate::docker::{nextflow_parser, extract_containers};
 use crate::settings::list_available_workflows;
 use crate::tempdir::TempDir;
 use crate::workflow::Workflow;
@@ -643,7 +642,7 @@ fn extract_nextflow_workflow_config(workflow_id: &str) -> (String, HashMap<Strin
 
     let wf_config = String::from_utf8_lossy(&output.stdout).into_owned();
     //println!("{}", wf_config);
-    let config = nextflow_parser(&wf_config);
+    let config = crate::xnf_parser::nextflow_parser(&wf_config);
     let mut version = String::from("?");
     if config.get("manifest.version").is_some() {
         version = String::from(config.get("manifest.version").unwrap());
@@ -858,13 +857,14 @@ pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &
                 let w = Workflow { project: String::from(project), name: String::from(name), version: asset.version};
                 wfs.push(w);
 
+                /*
                 if *docker {
                     let _x = extract_containers(&asset.config);
                     for container in _x {
                         println!("we have a [{}] container .... ", container);
                     }
                 }
-
+                */
             }
 
             // we need a dataframe for the items that we'll inject ...
