@@ -20,6 +20,7 @@ mod workflow;
 mod settings;
 
 mod xdocker;
+mod xmanifest;
 mod xnf_parser;
 mod xworkflows;
 
@@ -216,7 +217,7 @@ async fn main() {
             // if epi2me_opt.is_some() {
                 //let epi2me = epi2me_opt.unwrap();
                 //docker::docker_agent(&tempdir.unwrap(), &epi2me, project, list, pull, twome).await;
-                xdocker::docker_agent(&tempdir.unwrap(), project, list, pull, twome);
+                xdocker::docker_agent(&tempdir.unwrap(), project, list, pull, twome).await;
             //}
         },
 
