@@ -1,4 +1,4 @@
-use std::{path::PathBuf, collections::HashMap, fs, process::Command, io::Write};
+use std::{path::PathBuf, collections::HashMap, fs::{self, File}, process::Command, io::Write};
 use docker_api::{Docker, opts::{PullOpts, TagOpts}, Image};
 use futures::{StreamExt, TryStreamExt};
 use polars::prelude::*;
@@ -29,7 +29,7 @@ pub struct DockerContainer {
 }
 
 #[derive(Clone)]
-struct Epi2meDocker {
+pub struct Epi2meDocker {
     temp_dir: PathBuf,
     epi2me: Option<Epi2meSetup>,
     containers: Vec<Container>
@@ -62,6 +62,42 @@ impl Epi2meDocker {
             containers: Vec::new(),
         }    
     }
+
+    pub async fn from_epi2me_container(epi2me_container: Epi2meContainer, temp_dir: &PathBuf) -> Option<Self> {
+        let basis = Epi2meDocker {
+            temp_dir: temp_dir.to_owned(),
+            epi2me: epi2me_db::find_db(),
+            containers: Vec::new(),
+        };
+
+        if !epi2me_container.architecture.eq(&String::from(std::env::consts::ARCH)) {
+            eprintln!("there is a mismatch with arch - archive is [{:?}]", epi2me_container.architecture);
+            return None;
+        }
+        let docker = basis.new_docker();
+        for f in epi2me_container.files {
+            let mut fb = temp_dir.to_owned();
+            fb.push(f.relative_path);
+            fb.push(f.filename);
+            if fb.exists() {
+                println!("file [{:?}] being imported", fb);
+
+                let images = docker.images();
+                let f = File::open(fb).expect("Unable to open file");
+                let reader = Box::from(f);
+                let mut stream = images.import(reader);
+    
+                while let Some(import_result) = stream.next().await {
+                    match import_result {
+                        Ok(output) => println!("{output:?}"),
+                        Err(e) => eprintln!("Error: {e}"),
+                    }
+                }
+            }
+        }
+        return Some(basis); 
+    }
+
 
     fn extract_containers(&self, config: &HashMap<String, String>) -> Vec<String> {
         let mut container_vec: Vec<String> = Vec::new();
@@ -442,7 +478,7 @@ pub async fn docker_agent(tempdir: &TempDir, workflows: &Vec<String>, list: &boo
     let mut manifest_pb = PathBuf::from(&tempdir.path);
     manifest_pb.push(crate::xmanifest::MANIFEST_JSON);
     manifest.write(&manifest_pb);
-    manifest.tar(&Some(e2.clone()), 
+    manifest.tar( 
         &get_relative_path(&manifest_pb, &e2.epi2path), 
         &PathBuf::from(twome.clone().unwrap())
     );

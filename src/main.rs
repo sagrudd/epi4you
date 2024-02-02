@@ -1,7 +1,6 @@
 use app_db::dbmanager;
 use clap::{Parser, Subcommand, ArgAction};
 use epi2me_db::epi2me_manager;
-use importer::import_manager;
 use workflow::workflow_manager;
 
 mod app_db;
@@ -20,6 +19,7 @@ mod workflow;
 mod settings;
 
 mod xdocker;
+mod ximporter;
 mod xmanifest;
 mod xnf_parser;
 mod xworkflows;
@@ -256,7 +256,8 @@ async fn main() {
         },
 
         Some(Datatypes::Import { twome, force}) => {
-            import_manager(twome, force).await;
+            //import_manager(twome, force).await;
+            ximporter::import_coordinator(&tempdir.unwrap().path, twome, force).await;
         },
 
         None => {}
