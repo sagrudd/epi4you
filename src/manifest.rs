@@ -1,9 +1,9 @@
 use std::{path::PathBuf, fs::File, io::Read};
 use tar::Archive;
 use serde::{Serialize, Deserialize};
-use crate::{provenance::{Epi2MeProvenance, append_provenance}, json::{wrangle_manifest, get_manifest_str}, bundle::{sha256_str_digest, sha256_digest}, epi2me_tar::untar, app_db::insert_untarred_desktop_analysis, workflow::insert_untarred_workflow};
+use crate::{app_db::insert_untarred_desktop_analysis, epi2me_desktop_analysis::Epi2meDesktopAnalysis, epi2me_tar::untar, epi2me_workflow::Epi2meWorkflow, json::{get_manifest_str, wrangle_manifest}, provenance::Epi2MeProvenance, workflow::insert_untarred_workflow};
 
-pub static MANIFEST_JSON: &str = "4u_manifest.json";
+
 
 #[derive(Serialize, Deserialize, Clone)]
 #[derive(Debug)]
@@ -25,42 +25,7 @@ impl Default for FileManifest {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Clone)]
-#[derive(Debug)]
-#[allow(non_snake_case)]
-pub struct Epi2meDesktopAnalysis {
-    pub id: String,
-    pub path: String,
-    pub name: String,
-    pub status: String,
-    pub workflowRepo: String,
-    pub workflowUser: String,
-    pub workflowCommit: String,
-    pub workflowVersion: String,
-    pub createdAt: String,
-    pub updatedAt: String,
-    pub files: Vec<FileManifest>,
-}
 
-impl Default for Epi2meDesktopAnalysis {
-    fn default() -> Epi2meDesktopAnalysis {
-
-        Epi2meDesktopAnalysis {
-            id: String::from("undefined"),
-            path: String::from("undefined"),
-            name: String::from("undefined"),
-            status: String::from("undefined"),
-            workflowRepo: String::from("undefined"),
-            workflowUser: String::from("undefined"),
-            workflowCommit: String::from("undefined"),
-            workflowVersion: String::from("undefined"),
-            createdAt: String::from("undefined"),
-            updatedAt: String::from("undefined"),
-            files: Vec::<FileManifest>::new(),
-        }
-    }
-}
 
 
 #[derive(Serialize, Deserialize)]
@@ -74,28 +39,6 @@ pub struct Epi2meContainer {
 }
 
 
-#[derive(Serialize, Deserialize)]
-#[derive(Clone)]
-#[derive(Debug)]
-#[allow(non_snake_case)]
-pub struct Epi2meWorkflow {
-    pub project: String,
-    pub name: String,
-    pub version: String,
-    pub files: Vec<FileManifest>,
-}
-
-impl Default for Epi2meWorkflow {
-    fn default() -> Epi2meWorkflow {
-
-        Epi2meWorkflow {
-            project: String::from("undefined"),
-            name: String::from("undefined"),
-            version: String::from("undefined"),
-            files: Vec::<FileManifest>::new(),
-        }
-    }
-}
 
 
 #[derive(Serialize, Deserialize)]
@@ -189,25 +132,10 @@ pub fn _touch_manifest(man: &mut Epi2MeManifest) {
     man.provenance.push(touch_prov);
 }
 
-pub fn manifest_note_packaged_analysis(man: &mut Epi2MeManifest, id: &String) {
-    let action = vec![String::from("analysis_bundled"), String::from(id)].join(": ");
-    let pack = append_provenance(action, None, None, String::from(""));
-    man.provenance.push(pack);
-}
 
-pub fn manifest_note_packaged_workflow(man: &mut Epi2MeManifest, id: &String) {
-    let action = vec![String::from("workflow_bundled"), String::from(id)].join(": ");
-    let pack = append_provenance(action, None, None, String::from(""));
-    man.provenance.push(pack);
-}
 
-pub fn file_manifest_size(files: &Vec<FileManifest>) -> u64 {
-    let mut size: u64 = 0;
-    for file in files {
-        size += file.size;
-    }
-    return size;
-}
+
+
 
 
 pub fn load_manifest_from_tarball(twome: &PathBuf) -> Option<Epi2MeManifest> {

@@ -1,8 +1,9 @@
 use std::{fs::File, path::PathBuf, env};
 
-use tar::{Builder, Archive};
+use tar::{Builder};
 
-use crate::{manifest::FileManifest, epi2me_db};
+use crate::{epi2me_db, xmanifest::FileManifest};
+
 
 
 pub fn tar(wf_path: Option<&PathBuf>, tarfile: PathBuf, files: &Vec<FileManifest>, manifest: &PathBuf) {
@@ -37,7 +38,7 @@ pub fn tar(wf_path: Option<&PathBuf>, tarfile: PathBuf, files: &Vec<FileManifest
     
 }
 
-
+/* 
 pub fn untar(tarfile: &PathBuf) -> Option<PathBuf> {
     let local_prefix = epi2me_db::find_db().unwrap().epi4you_path;
     println!("untar of file [{:?}] into [{:?}]", tarfile, local_prefix);
@@ -60,3 +61,5 @@ pub fn untar(tarfile: &PathBuf) -> Option<PathBuf> {
 
     return None;
 }
+
+    */

@@ -2,7 +2,7 @@ use std::{path::PathBuf, fs};
 use glob::glob;
 use polars_core::prelude::DataFrame;
 use serde::{Serialize, Deserialize};
-use crate::{epi2me_db::{Epi2meSetup, self}, dataframe::{workflow_vec_to_df, print_polars_df, two_field_filter}, bundle::export_nf_workflow, manifest::Epi2meWorkflow};
+use crate::{bundle::export_nf_workflow, dataframe::{print_polars_df, two_field_filter, workflow_vec_to_df}, epi2me_db::{self, Epi2meSetup}, epi2me_workflow::Epi2meWorkflow};
 
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -13,38 +13,10 @@ pub struct Workflow {
     pub version: String,
 }
 
-pub fn get_workflow_struct(p: &String, n: &String, v: &String) -> Epi2meWorkflow {
-    return Epi2meWorkflow {
-        project: String::from(p),
-        name: String::from(n),
-        version: String::from(v),
-        ..Default::default()
-    };
-}
 
-pub fn get_epi2me_wfdir_path(app_db_path: &PathBuf) -> Option<PathBuf> {
-    let mut x = app_db_path.clone();
 
-    x.push("workflows");
-    if x.exists() {
-        println!("\tworkflows folder exists at [{}]", x.display());
-        return Some(x.clone());
-    }
-    return None;
-}
 
-pub fn check_defined_wfdir_exists(wfdir: &PathBuf, user: &str, repo: &str) -> Option<PathBuf> {
-    let mut x = wfdir.clone();
-    x.push(String::from("workflows"));
-    x.push(user);
-    x.push(repo);
-    if x.exists() && x.is_dir() {
-        println!("\tdefined workflow folder exists at [{}]", x.display());
-        return Some(x.clone());
-    }
-    eprintln!("\tworkflow folder does not exist at [{}]", x.display());
-    return None;
-}
+
 
 
 fn is_folder_wf_compliant(wffolder: &PathBuf) -> bool {

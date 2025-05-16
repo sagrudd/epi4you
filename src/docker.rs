@@ -6,7 +6,7 @@ use polars_core::{frame::DataFrame, series::Series};
 use regex::Regex;
 use serde::{Serialize, Deserialize};
 
-use crate::{tempdir::TempDir, epi2me_db::{Epi2meSetup, self}, xmanifest::{FileManifest, Epi2meContainer, Epi2MeContent}, bundle::get_relative_path};
+use crate::{epi2me_db::{self, Epi2meSetup}, epi2me_workflow, tempdir::TempDir, xmanifest::{self, Epi2MeContent, Epi2meContainer, FileManifest}};
 
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -133,9 +133,8 @@ impl Epi2meDocker {
     fn populate(&mut self) {
         println!("docker::populate");
         let e = self.epi2me.clone().unwrap();
-        let td = self.temp_dir.clone();
         
-        let workflows = crate::xworkflows::Epi2meWorkflow::new(td, Some(e));
+        let workflows = crate::xworkflows::Epi2meWorkflow::new(Some(e));
 
         for workflow in workflows.wf_vector() {
             let workflow_id = vec![String::from(&workflow.project), String::from(&workflow.name)].join("/");
@@ -347,9 +346,9 @@ impl Epi2meDocker {
                 return None;
             } else {
 
-                let relative_path = crate::bundle::clip_relative_path(&write_path, &local_prefix);
+                let relative_path = epi2me_workflow::clip_relative_path(&write_path, &local_prefix);
                 let file_size = &write_path.metadata().unwrap().len();
-                let checksum = crate::bundle::sha256_digest(&write_path.as_os_str().to_str().unwrap());
+                let checksum = xmanifest::sha256_digest(&write_path.as_os_str().to_str().unwrap());
 
                 let man = FileManifest{filename: tar_file,
                     relative_path: String::from(relative_path.clone().to_string_lossy().to_string()),
@@ -479,7 +478,7 @@ pub async fn docker_agent(tempdir: &TempDir, workflows: &Vec<String>, list: &boo
     manifest_pb.push(crate::xmanifest::MANIFEST_JSON);
     manifest.write(&manifest_pb);
     manifest.tar( 
-        &get_relative_path(&manifest_pb, &e2.epi2path), 
+        &epi2me_workflow::get_relative_path(&manifest_pb, &e2.epi2path), 
         &PathBuf::from(twome.clone().unwrap())
     );
 

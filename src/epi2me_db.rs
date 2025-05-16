@@ -3,7 +3,7 @@ use home;
 use path_clean::PathClean;
 use polars_core::frame::DataFrame;
 use serde::{Serialize, Deserialize};
-use crate::{json, workflow::{self, Workflow}, app_db, bundle};
+use crate::{app_db, bundle, epi2me_workflow::Epi2meWorkflow, json, xworkflows};
 
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -46,7 +46,7 @@ pub fn find_db() -> Option<Epi2meSetup> {
             let db_path = get_appdb_path(&path.clone().unwrap());
             let mut instances_path = PathBuf::from(&path.clone().unwrap());
             instances_path.push("instances");
-            let wf_dir = workflow::get_epi2me_wfdir_path(&path.clone().unwrap());
+            let wf_dir = xworkflows::get_epi2me_wfdir_path(&path.clone().unwrap());
             let for_you_dir: Option<PathBuf> = get_4you_path(&path.clone().unwrap());
 
             if db_path.is_some() && wf_dir.is_some() {
@@ -152,7 +152,7 @@ pub fn epi2me_manager(epi2me: &Epi2meSetup, df: &DataFrame, list: &bool, runids:
         }
     }
 
-    let mut bundle_wfs: Vec<Workflow> = Vec::new();
+    let mut bundle_wfs: Vec<Epi2meWorkflow> = Vec::new();
 
     // if we're here the runids supplied are coherent
     for runid_str in runids {

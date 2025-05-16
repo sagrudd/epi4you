@@ -4,16 +4,14 @@ use rusqlite::{Connection, Result};
 use polars::prelude::*;
 use polars::df;
 use ulid::Ulid;
-use url::Position;
-use url::Url;
 use std::{env, fs};
 use std::path::PathBuf;
 use crate::dataframe::analysis_vec_to_df;
 use crate::dataframe::filter_df_by_value;
 use crate::dataframe::get_zero_val;
-use crate::manifest::Epi2meDesktopAnalysis;
-use crate::workflow::Workflow;
-use crate::{workflow, epi2me_db};
+use crate::epi2me_desktop_analysis::Epi2meDesktopAnalysis;
+use crate::epi2me_workflow::Epi2meWorkflow;
+use crate::epi2me_db;
 
 
 #[allow(dead_code)]
@@ -70,7 +68,7 @@ pub fn load_db(path: &PathBuf) -> Result<DataFrame, rusqlite::Error> {
 
 
 
-fn get_db_id_entry(runid: &String, polardb: &DataFrame) -> Result<DataFrame, PolarsError> {
+pub fn get_db_id_entry(runid: &String, polardb: &DataFrame) -> Result<DataFrame, PolarsError> {
     // is runid in name field and unique
     let df = filter_df_by_value(polardb, &String::from("name"), runid);
     let df2 = filter_df_by_value(polardb, &String::from("id"), runid);
@@ -84,7 +82,7 @@ pub fn get_qualified_analysis_path(runid: &String, polardb: &DataFrame) -> PathB
 
 
 
-pub fn validate_qualified_analysis_workflow(runid: &String, polardb: &DataFrame, epi2wf_dir: &PathBuf) -> Option<Workflow> {
+pub fn validate_qualified_analysis_workflow(runid: &String, polardb: &DataFrame, epi2wf_dir: &PathBuf) -> Option<Epi2meWorkflow> {
     
     let stacked = get_db_id_entry(runid, polardb).unwrap();
     let wf_proj = get_zero_val(&stacked, &String::from("workflowUser"));
@@ -98,11 +96,12 @@ pub fn validate_qualified_analysis_workflow(runid: &String, polardb: &DataFrame,
     workflow.push_str(&wf_repo);
     println!("repo {}", workflow);
 
-    // let's check that the path exists ...
-    let wfdir_exists = workflow::check_defined_wfdir_exists(epi2wf_dir, &wf_proj, &wf_repo);
-    if wfdir_exists.is_some() {
-        let wf = Workflow{project: wf_proj, name: wf_repo, version: wf_vers};
-        return Some(wf);
+    let workflow = Epi2meWorkflow::init(&wf_proj, &wf_repo, &wf_vers);
+    let dir = workflow.check_defined_wfdir_exists(epi2wf_dir);
+
+    if dir.is_some() {
+
+        return Some(workflow);
     }
 
     return None;
@@ -166,95 +165,7 @@ fn get_instance_struct_from_desktop_analysis(danalysis: &Epi2meDesktopAnalysis) 
 } 
 
 
-pub fn get_analysis_struct_from_cli(ulid_str: &String, source: &PathBuf, nextflow_stdout: &String, timestamp: &String) -> Option<Epi2meDesktopAnalysis>  {
 
-    let mut log = PathBuf::from(source);
-    log.push("nextflow.stdout");
-
-    // println!("{}", nextflow_stdout);
-
-    let mut name = "";
-    let mut revision = "";
-    let revision_key = " - revision: ";
-    let url_str_key = "Launching `";
-    let mut project = String::from("");
-    let mut pname = String::from("");
-    let mut version = String::from("");
-    let xxxkey = "||||||||||";
-
-    let lines = nextflow_stdout.split("\n");
-    for line in lines {
-        if line.starts_with(url_str_key) {
-            println!("{line}");
-
-            name = &line[line.find("[").unwrap()+1..line.find("]").unwrap()];
-            revision = &line[line.find(revision_key).unwrap()+revision_key.len()..];
-            revision = &revision[..revision.find(" ").unwrap()];
-            let mut url_str = &line[line.find(url_str_key).unwrap()+url_str_key.len()..];
-            url_str = &url_str[..url_str.find("`").unwrap()];
-
-            let url = Url::parse(url_str);
-            if url.is_ok() {
-                let data_url_payload = &url.unwrap()[Position::AfterHost..][1..];
-                println!("{:?}", &data_url_payload);
-
-                let x = &data_url_payload.split_once('/');
-                if x.is_some() {
-                    let (aproject, apname) = x.clone().unwrap();
-                    project = String::from(aproject);
-                    pname = String::from(apname);
-                }
-            }
-        } else if line.contains(xxxkey) && line.contains(&pname) {
-            println!("extracting vers from [{}]", line);
-            let v = line[line.find(&pname).unwrap()+pname.len()..].trim();
-            version = String::from(&v[.. v.find("-").unwrap()]);
-            //println!("{v}");
-        }
-    }
-
-    let x = Epi2meDesktopAnalysis { 
-        id: String::from(ulid_str),
-        path: String::from(source.to_str().unwrap()),
-        name: String::from(name),
-        status: String::from("COMPLETED"),
-        workflowRepo: pname,
-        workflowUser: project,
-        workflowCommit: String::from(revision),
-        workflowVersion: version,
-        createdAt: String::from(timestamp),
-        updatedAt: String::from(timestamp),
-        ..Default::default()
-    };
-
-    println!("{:?}", x);
-    return Some(x);
-}
-
-
-
-pub fn get_analysis_struct(runid: &String, polardb: &DataFrame) -> Option<Epi2meDesktopAnalysis> {
-    if validate_db_entry(runid, polardb) {
-        let stacked = get_db_id_entry(runid, polardb).unwrap();
-        // this is obligate pass due to previous validation
-
-        let x = Epi2meDesktopAnalysis { 
-            id: get_zero_val(&stacked, &String::from("id")),
-            path: get_zero_val(&stacked, &String::from("path")),
-            name: get_zero_val(&stacked, &String::from("name")),
-            status: get_zero_val(&stacked, &String::from("status")),
-            workflowRepo: get_zero_val(&stacked, &String::from("workflowRepo")),
-            workflowUser: get_zero_val(&stacked, &String::from("workflowUser")),
-            workflowCommit: get_zero_val(&stacked, &String::from("workflowCommit")),
-            workflowVersion: get_zero_val(&stacked, &String::from("workflowVersion")),
-            createdAt: get_zero_val(&stacked, &String::from("createdAt")),
-            updatedAt: get_zero_val(&stacked, &String::from("updatedAt")),
-            ..Default::default() };
-        return Some(x);
-    }
-
-    return None;
-}
 
 
 pub fn print_appdb(df: &DataFrame) {

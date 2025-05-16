@@ -1,10 +1,11 @@
-use std::{path::PathBuf, fs::{self, File}, env, io::Read};
+use std::{env, fs::{self, File}, io::{BufReader, Read}, path::PathBuf};
+use data_encoding::HEXUPPER;
+use ring::digest::{Context, SHA256};
+use stringreader::StringReader;
 use tar::{Builder, Archive};
-use uuid::Uuid;
 use serde::{Serialize, Deserialize};
-use chrono::prelude::*;
 
-use crate::{bundle::{sha256_str_digest, sha256_digest}, epi2me_db::Epi2meSetup};
+use crate::{app_db::{self}, epi2me_desktop_analysis::Epi2meDesktopAnalysis, epi2me_workflow::Epi2meWorkflow, provenance::Epi2MeProvenance};
 
 
 pub static MANIFEST_JSON: &str = "4u_manifest.json";
@@ -33,43 +34,6 @@ impl Default for FileManifest {
 
 
 
-#[derive(Serialize, Deserialize)]
-#[derive(Clone)]
-#[derive(Debug)]
-#[allow(non_snake_case)]
-pub struct Epi2meDesktopAnalysis {
-    pub id: String,
-    pub path: String,
-    pub name: String,
-    pub status: String,
-    pub workflowRepo: String,
-    pub workflowUser: String,
-    pub workflowCommit: String,
-    pub workflowVersion: String,
-    pub createdAt: String,
-    pub updatedAt: String,
-    pub files: Vec<FileManifest>,
-}
-
-impl Default for Epi2meDesktopAnalysis {
-    fn default() -> Epi2meDesktopAnalysis {
-
-        Epi2meDesktopAnalysis {
-            id: String::from(UNDEFINED),
-            path: String::from(UNDEFINED),
-            name: String::from(UNDEFINED),
-            status: String::from(UNDEFINED),
-            workflowRepo: String::from(UNDEFINED),
-            workflowUser: String::from(UNDEFINED),
-            workflowCommit: String::from(UNDEFINED),
-            workflowVersion: String::from(UNDEFINED),
-            createdAt: String::from(UNDEFINED),
-            updatedAt: String::from(UNDEFINED),
-            files: Vec::<FileManifest>::new(),
-        }
-    }
-}
-
 
 #[derive(Serialize, Deserialize)]
 #[derive(Clone)]
@@ -82,28 +46,7 @@ pub struct Epi2meContainer {
 }
 
 
-#[derive(Serialize, Deserialize)]
-#[derive(Clone)]
-#[derive(Debug)]
-#[allow(non_snake_case)]
-pub struct Epi2meWorkflow {
-    pub project: String,
-    pub name: String,
-    pub version: String,
-    pub files: Vec<FileManifest>,
-}
 
-impl Default for Epi2meWorkflow {
-    fn default() -> Epi2meWorkflow {
-
-        Epi2meWorkflow {
-            project: String::from(UNDEFINED),
-            name: String::from(UNDEFINED),
-            version: String::from(UNDEFINED),
-            files: Vec::<FileManifest>::new(),
-        }
-    }
-}
 
 
 #[derive(Serialize, Deserialize)]
@@ -117,33 +60,11 @@ pub enum Epi2MeContent {
   }
 
 
-#[derive(Serialize, Deserialize)]
-#[derive(Clone)]
-#[derive(Debug)]
-pub struct Epi2MeProvenance {
-    pub id: String,
-    pub action: String,
-    pub value: Option<String>,
-    pub user: String,
-    pub timestamp: String,
-}
-
-impl Default for Epi2MeProvenance {
-    fn default() -> Epi2MeProvenance {
-
-        Epi2MeProvenance {
-            id: Uuid::new_v4().to_string(),
-            action: String::from(UNDEFINED),
-            value: None,
-            user: whoami::username(),
-            timestamp: Local::now().to_string(),
-        }
-    }
-}
 
 
 
-#[derive(Clone, Serialize, Deserialize)]
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Epi2MeManifest {
     pub id: String,
     pub src_path: String,
@@ -200,6 +121,20 @@ impl Epi2MeManifest {
     }
 
 
+    pub fn note_packaged_analysis(&mut self, id: &String) {
+        let action = vec![String::from("analysis_bundled"), String::from(id)].join(": ");
+        let prov = Epi2MeProvenance::init(action, None);
+        self.provenance.push(prov);
+    }
+
+
+pub fn note_packaged_workflow(&mut self, id: &String) {
+    let action = vec![String::from("workflow_bundled"), String::from(id)].join(": ");
+    let prov = Epi2MeProvenance::init(action, None);
+    self.provenance.push(prov);
+}
+
+
     pub fn untar(&mut self, tarfile: &PathBuf, temp_dir: &PathBuf) -> Option<PathBuf> {
         println!("untar of file [{:?}] into [{:?}]", tarfile, temp_dir);
         let _ = env::set_current_dir(&temp_dir);
@@ -238,8 +173,8 @@ impl Epi2MeManifest {
                 },
                 
                 Epi2MeContent::Epi2mePayload(desktop_analysis) => {
-                    println!("importing DesktopAnalysis[{}]", &desktop_analysis.id);
-                    //insert_untarred_desktop_analysis(desktop_analysis);
+                    println!("importing DesktopAnalysis [{}]", &desktop_analysis.id);
+                    app_db::insert_untarred_desktop_analysis(desktop_analysis);
                 },
     
     
@@ -288,13 +223,7 @@ impl Epi2MeManifest {
 
 
     fn append_provenance(&mut self, what: String, value: Option<String>) {
-        let when = Local::now().to_string();
-        let prov = Epi2MeProvenance{
-            action: String::from(what),
-            value,
-            timestamp: when,
-            ..Default::default()
-        };
+        let prov = Epi2MeProvenance::init(what, value);
         self.provenance.push(prov);
     
     }
@@ -310,7 +239,7 @@ impl Epi2MeManifest {
         self.signature = signature;
     }
 
-    fn to_string(&mut self) -> String {
+    pub fn to_string(&mut self) -> String {
         self.sign();
         serde_json::to_string_pretty(&self).unwrap()
     }
@@ -368,4 +297,41 @@ impl Epi2MeManifest {
 
     } 
 
+}
+
+
+pub fn sha256_digest(path: &str) -> String {
+
+    let input = File::open(path).unwrap();
+    let mut reader = BufReader::new(input);
+
+    let mut context = Context::new(&SHA256);
+    let mut buffer = [0; 1024];
+    loop {
+        let count = reader.read(&mut buffer).unwrap();
+        if count == 0 {
+            break;
+        }
+        context.update(&buffer[..count]);
+    }
+
+    HEXUPPER.encode(context.finish().as_ref())
+}
+
+
+pub fn sha256_str_digest(payload_str: &str) -> String {
+
+    let streader = StringReader::new(payload_str);
+    let mut reader = BufReader::new(streader);
+
+    let mut context = Context::new(&SHA256);
+    let mut buffer = [0; 1024];
+    loop {
+        let count = reader.read(&mut buffer).unwrap();
+        if count == 0 {
+            break;
+        }
+        context.update(&buffer[..count]);
+    }
+    HEXUPPER.encode(context.finish().as_ref())
 }

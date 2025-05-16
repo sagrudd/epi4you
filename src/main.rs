@@ -8,9 +8,9 @@ mod bundle;
 mod epi2me_db;
 mod epi2me_tar;
 mod dataframe;
-mod importer;
+// mod importer;
 mod json;
-mod manifest;
+// mod manifest;
 mod nextflow;
 mod provenance;
 mod tempdir;
@@ -22,6 +22,9 @@ mod ximporter;
 mod xmanifest;
 mod xnf_parser;
 mod xworkflows;
+
+mod epi2me_desktop_analysis;
+mod epi2me_workflow;
 
 /// Trivial application to package EPI2ME workflows and analysis results
 #[derive(Parser)]

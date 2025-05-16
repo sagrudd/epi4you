@@ -1,8 +1,7 @@
 use std::{fs, path::PathBuf};
 use glob::glob;
-use polars::prelude::*;
 use serde::{Serialize, Deserialize};
-use crate::{epi2me_db::Epi2meSetup, xnf_parser, dataframe::print_polars_df};
+use crate::{epi2me_db::Epi2meSetup, xnf_parser};
 
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -15,15 +14,13 @@ pub struct Workflow {
 
 #[derive(Clone)]
 pub struct Epi2meWorkflow {
-    temp_dir: PathBuf,
     epi2me: Option<Epi2meSetup>,
     workflows: Vec<Workflow>,
 }
 
 impl Epi2meWorkflow {
-    pub fn new(tempdir: PathBuf, epi2me: Option<Epi2meSetup>) -> Self {
+    pub fn new(epi2me: Option<Epi2meSetup>) -> Self {
         let mut wf = Epi2meWorkflow {
-            temp_dir: tempdir,
             epi2me: epi2me.to_owned(),
             workflows: Vec::new(),
         };
@@ -77,7 +74,7 @@ impl Epi2meWorkflow {
         println!("items == [{}]", self.workflows.len());
     }
 
-
+    /*
     pub fn workflows_df(&self) -> DataFrame {
         let x: Vec<String> = self.workflows.iter().map(|v| String::from(&v.project)).collect();
         let y: Vec<String> = self.workflows.iter().map(|v| String::from(&v.name)).collect();
@@ -91,7 +88,7 @@ impl Epi2meWorkflow {
 
     pub fn print(&mut self) {
         print_polars_df(&self.workflows_df());
-    }
+    } */
 
     pub fn wf_vector(&self) -> Vec<Workflow> {
         return self.workflows.clone();
@@ -138,4 +135,16 @@ impl Epi2meWorkflow {
     }
 
 
+}
+
+
+pub fn get_epi2me_wfdir_path(app_db_path: &PathBuf) -> Option<PathBuf> {
+    let mut x = app_db_path.clone();
+
+    x.push("workflows");
+    if x.exists() {
+        println!("\tworkflows folder exists at [{}]", x.display());
+        return Some(x.clone());
+    }
+    return None;
 }

@@ -29,11 +29,11 @@ pub async fn import_coordinator(temp_dir: &PathBuf, twome: &Option<String>, forc
             let epi2me_content = x.to_owned();
 
             match epi2me_content {
-                Epi2MeContent::Epi2meWf(epi2me_workflow) => {
+                Epi2MeContent::Epi2meWf(_epi2me_workflow) => {
 
                 },
                 
-                Epi2MeContent::Epi2mePayload(desktop_analysis) => {
+                Epi2MeContent::Epi2mePayload(_desktop_analysis) => {
 
                 },
 

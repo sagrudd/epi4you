@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-use crate::manifest::{load_manifest_from_tarball, is_manifest_honest, import_resolved_content};
+use crate::xmanifest::Epi2MeManifest;
+
+
 
 
 
@@ -11,9 +13,10 @@ pub async fn import_manager(twome: &Option<String>, force: &bool) {
         return; 
     } else {
         let path = PathBuf::from(twome.as_ref().unwrap());
-        let manifest = load_manifest_from_tarball(&path);
+        let manifest_opt = Epi2MeManifest::from_tarball(path);
 
-        if manifest.is_some() {
+        if manifest_opt.is_some() {
+            let mut manifest = manifest_opt.unwrap();
 
             /* 
 
@@ -57,14 +60,15 @@ pub async fn import_manager(twome: &Option<String>, force: &bool) {
 
             */
 
-            let honest = is_manifest_honest(&manifest.unwrap(), &path, force);
-            if honest.is_none() {
+
+            if manifest.is_trusted() {
+                println!("importing something");
+                // import_resolved_content(&honest.unwrap(), force).await;
+            } else {
                 eprintln!("this epi4you archive is not trusted - exiting");
                 return;
-            } if honest.is_some() {
-                println!("importing something");
-                import_resolved_content(&honest.unwrap(), force).await;
             }
+
 
             
 

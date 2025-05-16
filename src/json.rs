@@ -2,9 +2,8 @@ use std::path::PathBuf;
 use std::fs::File;
 use serde::{Serialize, Deserialize};
 use serde_json;
-use std::fs;
 
-use crate::manifest::Epi2MeManifest;
+
 extern crate serde;
 
 #[derive(Serialize, Deserialize)]
@@ -28,6 +27,8 @@ pub fn config_json(path_buf: &PathBuf) -> String {
     return epi2me_setup.workingDirectory;
 }
 
+/* 
+
 pub fn write_manifest_str(manifest: &Epi2MeManifest, destination: &PathBuf) {
     println!("writing manifest to path [{:?}]", destination);
     let x = fs::write(destination, get_manifest_str(manifest));
@@ -45,3 +46,5 @@ pub fn get_manifest_str(manifest: &Epi2MeManifest) -> String {
 pub fn wrangle_manifest(manifest: &Epi2MeManifest) {
     println!("{}", get_manifest_str(manifest));
 }
+
+    */
