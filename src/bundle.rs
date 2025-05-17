@@ -7,7 +7,7 @@ use std::fs::remove_dir_all;
 
 use crate::epi2me_db::{self};
 use crate::epi2me_desktop_analysis::Epi2meDesktopAnalysis;
-use crate::epi2me_tar;
+use crate::{epi2me_tar, xnf_parser};
 use crate::epi2me_workflow::{get_relative_path, Epi2meWorkflow};
 use crate::tempdir::{self, TempDir};
 
@@ -139,6 +139,8 @@ pub fn export_cli_run(ulidstr: &String, source: PathBuf, temp_dir: TempDir, dest
     println!("packing [{:?}] into .2me format archive", &source.clone());
     
     let mut vehicle = Epi2meDesktopAnalysis::init(ulidstr, &source, nextflow_stdout, timestamp);
+
+    /* we need to parse some information here - at least the tuple of user//repo */
 
 
         manifest.note_packaged_analysis(

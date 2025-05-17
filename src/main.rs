@@ -25,6 +25,7 @@ mod xworkflows;
 
 mod epi2me_desktop_analysis;
 mod epi2me_workflow;
+mod nextflow_log_parser;
 
 /// Trivial application to package EPI2ME workflows and analysis results
 #[derive(Parser)]

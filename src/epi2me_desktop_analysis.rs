@@ -4,7 +4,7 @@ use polars::frame::DataFrame;
 use serde::{Deserialize, Serialize};
 use url::{Position, Url};
 use glob::glob;
-use crate::{app_db::{self, validate_db_entry}, dataframe::get_zero_val, epi2me_workflow::clip_relative_path, xmanifest::{sha256_digest, FileManifest}};
+use crate::{app_db::{self, validate_db_entry}, dataframe::get_zero_val, epi2me_workflow::clip_relative_path, nextflow_log_parser::NextFlowLogs, xmanifest::{sha256_digest, FileManifest}};
 
 
 
@@ -83,47 +83,18 @@ impl Epi2meDesktopAnalysis {
             log.push("nextflow.stdout");
         
             // println!("{}", nextflow_stdout);
+
+            let nlp = NextFlowLogs::init(nextflow_stdout);
+            nlp.test();
+
+            panic!();
         
-            let mut name = "";
-            let mut revision = "";
-            let revision_key = " - revision: ";
-            let url_str_key = "Launching `";
-            let mut project = String::from("");
-            let mut pname = String::from("");
-            let mut version = String::from("");
-            let xxxkey = "||||||||||";
-        
-            let lines = nextflow_stdout.split("\n");
-            for line in lines {
-                // println!("!{line}");
-                if line.starts_with(url_str_key) {
-                    println!("{line}");
-        
-                    name = &line[line.find("[").unwrap()+1..line.find("]").unwrap()];
-                    revision = &line[line.find(revision_key).unwrap()+revision_key.len()..];
-                    revision = &revision[..revision.find(" ").unwrap()];
-                    let mut url_str = &line[line.find(url_str_key).unwrap()+url_str_key.len()..];
-                    url_str = &url_str[..url_str.find("`").unwrap()];
-        
-                    let url = Url::parse(url_str);
-                    if url.is_ok() {
-                        let data_url_payload = &url.unwrap()[Position::AfterHost..][1..];
-                        println!("{:?}", &data_url_payload);
-        
-                        let x = &data_url_payload.split_once('/');
-                        if x.is_some() {
-                            let (aproject, apname) = x.clone().unwrap();
-                            project = String::from(aproject);
-                            pname = String::from(apname);
-                        }
-                    }
-                } else if line.contains(xxxkey) && pname.len() > 0 && line.contains(&pname) {
-                    println!("extracting vers from [{}]", line);
-                    let v = line[line.find(&pname).unwrap()+pname.len()..].trim();
-                    version = String::from(&v[.. v.find("-").unwrap()]);
-                    //println!("{v}");
-                }
-            }
+            let name = nlp.get_value("name");
+
+            let pname = nlp.get_value("repo");
+            let project = nlp.get_value("repo");
+            let revision = nlp.get_value("repo");
+            let version = nlp.get_value("repo");
         
             let x = Epi2meDesktopAnalysis { 
                 id: String::from(ulid_str),
