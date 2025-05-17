@@ -1,7 +1,7 @@
 use std::env;
 use polars_core::prelude::*;
 use polars::prelude::*;
-use crate::{workflow::Workflow, app_db::Epi2MeAnalysis, nextflow::{NxfLogItem, NextflowAssetWorkflow}};
+use crate::{app_db::Epi2MeAnalysis, depme_nextflow::NextflowAssetWorkflow, nextflow::nextflow_log_item::NxfLogItem, workflow::Workflow};
 
 
 #[macro_export]

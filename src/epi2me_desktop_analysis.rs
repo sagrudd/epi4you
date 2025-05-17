@@ -87,14 +87,13 @@ impl Epi2meDesktopAnalysis {
             let nlp = NextFlowLogs::init(nextflow_stdout);
             nlp.test();
 
-            panic!();
+            // panic!();
         
             let name = nlp.get_value("name");
-
-            let pname = nlp.get_value("repo");
-            let project = nlp.get_value("repo");
-            let revision = nlp.get_value("repo");
-            let version = nlp.get_value("repo");
+            let pname = nlp.get_value("pname");
+            let project = nlp.get_value("project");
+            let revision = nlp.get_value("revision");
+            let version = nlp.get_value("version");
         
             let x = Epi2meDesktopAnalysis { 
                 id: String::from(ulid_str),

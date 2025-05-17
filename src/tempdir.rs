@@ -2,7 +2,7 @@ use std::{path::PathBuf, fs::{create_dir_all, self}, fmt, env};
 
 use ulid::Ulid;
 
-use crate::epi2me_db::find_db;
+use crate::{epi2me_db::find_db, epi4you_errors::Epi4youError};
 
 
 pub fn form_tempdir(temp_path: PathBuf) -> Option<TempDir> {
@@ -28,9 +28,9 @@ pub fn get_named_tempdir(temp_subdir: &String) -> Option<TempDir> {
 }
 
 
-pub fn get_tempdir() -> Option<TempDir> {
+pub fn get_tempdir() -> Result<TempDir, Epi4youError> {
     let ulid_str = Ulid::new().to_string();
-    return get_named_tempdir(&ulid_str);
+    return Ok(get_named_tempdir(&ulid_str).unwrap());
 }
 
 #[derive(Clone)]

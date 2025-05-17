@@ -59,10 +59,10 @@ pub fn export_nf_workflow(wf_path: Option<&PathBuf>, source: &DataFrame, twome: 
         temp_dir = tempdir.unwrap();
     } else {
         let tempdir = tempdir::get_tempdir();
-        if tempdir.is_none() {
+        if tempdir.is_err() {
             return;
         }
-        temp_dir = tempdir.unwrap();
+        temp_dir = tempdir.ok().unwrap();
     }
 
     let mut manifest = Epi2MeManifest::new(temp_dir.path.clone());
@@ -136,7 +136,7 @@ pub fn export_cli_run(ulidstr: &String, source: PathBuf, temp_dir: TempDir, dest
     let mut manifest = Epi2MeManifest::new(temp_dir.path.clone());
     let mut all_files: Vec<FileManifest> = Vec::new();
 
-    println!("packing [{:?}] into .2me format archive", &source.clone());
+    log::info!("packing [{:?}] into .2me format archive", &source.clone());
     
     let mut vehicle = Epi2meDesktopAnalysis::init(ulidstr, &source, nextflow_stdout, timestamp);
 
@@ -193,10 +193,10 @@ pub fn export_desktop_run(wf_path: Option<&PathBuf>, runids: &Vec<String>, polar
     let dest = destination.unwrap();
     // create a temporary path for this export exploration
     let tempdir = tempdir::get_tempdir();
-    if tempdir.is_none() {
+    if tempdir.is_err() {
         return;
     }
-    let temp_dir = tempdir.unwrap();
+    let temp_dir = tempdir.ok().unwrap();
     println!("using tempdir at [{}]", &temp_dir);
     let mut manifest = Epi2MeManifest::new(temp_dir.path.clone()); 
     let mut all_files: Vec<FileManifest> = Vec::new();

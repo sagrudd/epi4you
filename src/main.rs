@@ -1,6 +1,9 @@
 use app_db::dbmanager;
-use clap::{Parser, Subcommand, ArgAction};
+use clap::{Arg, ArgAction, Command, Parser, Subcommand};
+use create_2me::create_from_cli_run;
+use env_logger::Env;
 use epi2me_db::epi2me_manager;
+use epi4you_errors::Epi4youError;
 use workflow::workflow_manager;
 
 mod app_db;
@@ -11,7 +14,7 @@ mod dataframe;
 // mod importer;
 mod json;
 // mod manifest;
-mod nextflow;
+mod depme_nextflow;
 mod provenance;
 mod tempdir;
 mod workflow;
@@ -27,14 +30,27 @@ mod epi2me_desktop_analysis;
 mod epi2me_workflow;
 mod nextflow_log_parser;
 
-/// Trivial application to package EPI2ME workflows and analysis results
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    #[command(subcommand)]
-    command: Option<Datatypes>,
+////////////////
 
+pub mod epi4you;
+pub mod epi4you_errors;
+
+pub mod create_2me {
+    pub mod create_from_cli_run;
+    pub mod create_from_nf_artefact;
 }
+
+pub mod nextflow {
+    pub mod nextflow_artefact;
+    pub mod nextflow_progress;
+    pub mod nextflow_toolkit;
+    pub mod nextflow_log_item;
+    pub mod nextflow_analysis;
+}
+
+
+
+/* 
 
 #[derive(Subcommand)]
 enum Datatypes {
@@ -156,31 +172,7 @@ enum Datatypes {
 
 
     /// cli exectured nextflow runs
-    NextflowRun {
-        /// List analyses run using Desktop Client
-        #[arg(short, long, action=ArgAction::SetTrue)]
-        list: bool,
 
-        /// path to nextflow binary (if not obvious)
-        #[arg(short, long, default_value = None)]
-        nxf_bin: Option<String>,
-
-        /// path to nextflow work folder
-        #[arg(short = 'w', long, default_value = None)]
-        nxf_work: Option<String>,
-
-        /// Export EPI2ME analysis by nun_name
-        #[arg(short, long)]
-        runid: Option<String>,
-
-        /// target twome archive file
-        #[arg(short, long)]
-        twome: Option<String>,
-
-        /// force overwrite of exising twome archive
-        #[arg(short, long, action=ArgAction::SetTrue)]
-        force: bool,
-    },
 
     /// the core nextflow workflows used by the application
     Workflow {
@@ -202,16 +194,55 @@ enum Datatypes {
 
     },
 }
+*/
+
 
 #[tokio::main]
 async fn main() {
-    let cliargs = Args::parse();
+
+    let env = Env::default()
+    .filter_or("MY_LOG_LEVEL", "debug")
+    .write_style_or("MY_LOG_STYLE", "always");
+    env_logger::init_from_env(env);
 
     let tempdir = tempdir::get_tempdir();
-    if tempdir.is_none() {
+    if tempdir.is_err() {
         eprintln!("error creating tempdir - aborting!");
         return;
     }
+
+    let use_args: Vec<Arg> = Vec::<Arg>::new();
+    let mut subcmds: Vec<Command> = Vec::<Command>::new();
+
+    subcmds.push(create_from_cli_run::get_cli_setup());
+
+    let app = Command::new(epi4you::APPLICATION_NAME)
+    .subcommand_required(false)
+    .version(epi4you::APPLICATION_VERSION)
+    .author(epi4you::APPLICATION_AUTHOR)
+    .about(epi4you::APPLICATION_ABOUT)
+    .long_about(epi4you::APPLICATION_DESCRIPTION)
+    .args(use_args)
+    .subcommands(subcmds.clone());
+
+    let xargs = app.try_get_matches();
+    if xargs.is_ok() {
+        let cmdkeys: Vec<&str> = subcmds.iter().map(|x| x.get_name()).collect();
+
+        let status;
+
+        if cmdkeys.contains(&create_from_cli_run::NEXTFLOW_RUN) && xargs.as_ref().ok().unwrap().subcommand_matches(create_from_cli_run::NEXTFLOW_RUN).is_some()  { 
+            log::debug!("subcommand [{}] has been called", create_from_cli_run::NEXTFLOW_RUN);
+            status = create_from_cli_run::process_clicapture_command(&xargs.ok().unwrap().subcommand_matches(create_from_cli_run::NEXTFLOW_RUN).unwrap(), &mut tempdir.ok().unwrap());
+        } else {
+            status = malformed_cli();
+        }
+
+    } else {
+        println!("{:?}", xargs.as_ref().err().unwrap().print().ok().unwrap());
+    }
+
+    /* 
 
     match &cliargs.command {
 
@@ -266,4 +297,11 @@ async fn main() {
         None => {}
     }
 
+    */
+
+}
+
+
+fn malformed_cli() -> Result<(), Epi4youError> {
+    return Err(Epi4youError::MalformedCLISetup);
 }
