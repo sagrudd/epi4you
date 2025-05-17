@@ -147,23 +147,6 @@ fn get_instance_struct(runid: &String, polardb: &DataFrame) -> Option<Epi2MeAnal
     return None;
 }
 
-fn get_instance_struct_from_desktop_analysis(danalysis: &Epi2meDesktopAnalysis) -> Option<Epi2MeAnalysis> {
-    
-    let x = Epi2MeAnalysis { 
-        id: String::from(&danalysis.id),
-        path: String::from(&danalysis.path),
-        name: String::from(&danalysis.name),
-        status: String::from(&danalysis.status),
-        workflowRepo: String::from(&danalysis.workflowRepo),
-        workflowUser: String::from(&danalysis.workflowUser),
-        workflowCommit: String::from(&danalysis.workflowCommit),
-        workflowVersion: String::from(&danalysis.workflowVersion),
-        createdAt: String::from(&danalysis.createdAt),
-        updatedAt: String::from(&danalysis.updatedAt),
-    };
-    return Some(x);
-} 
-
 
 
 
@@ -452,27 +435,29 @@ fn clone_extant_database_entry(runid_str: &String, epi2me_instances: &DataFrame,
 }
 
 
-pub fn insert_untarred_desktop_analysis(desktop_analysis: &Epi2meDesktopAnalysis) {
+pub fn insert_untarred_desktop_analysis(desktop_analysis: &Epi2meDesktopAnalysis, temp_dir: &PathBuf) {
 
-    let epi2meitem = get_instance_struct_from_desktop_analysis(desktop_analysis);
-    if epi2meitem.is_some() {
-        let e2eitem = epi2meitem.unwrap();
-        let src_dir = epi2me_db::find_db().unwrap().epi4you_path;
+    log::warn!("insert_untarred_desktop_analysis");
+
+    let e2eitem = desktop_analysis.as_epi2me_analysis();
+
+        // let src_dir = epi2me_db::find_db().unwrap().epi2path;
         // src_dir.push("instances");
         // src_dir.push(vec![String::from(&e2eitem.workflowRepo) ,String::from(&e2eitem.id)].join("_"));
 
         let clone: Option<String> = None; // keep the name already used
         let epi2meitem_x = epi2me_item_rebrand(&e2eitem, &clone);
-        println!("new epi2meobj = {:?}", &epi2meitem_x);
+        log::info!("new epi2meobj = {:?}", &epi2meitem_x);
         
         insert_into_db(&epi2me_db::find_db().unwrap().epi2db_path, &epi2meitem_x);
 
         // and copy across the accompanying files ...
         for file in &desktop_analysis.files {
-            let file_to_check = PathBuf::from(&src_dir).join(&file.relative_path).join(PathBuf::from(&file.filename));
+            let file_to_check = PathBuf::from(&temp_dir).join(&file.relative_path).join(PathBuf::from(&file.filename));
             
             let mut rp = PathBuf::from(&file.relative_path);
-            //println!("relative path == {:?}", rp);
+            // log::error!("relative path == {:?}", rp);
+            // log::error!("temppath      == {:?}", temp_dir);
             if rp.starts_with("instances") || rp.starts_with("import_export_4you") || rp.starts_with("tmp") {
                 if rp.starts_with("instances") {
                     rp = PathBuf::from(rp.strip_prefix("instances").unwrap());
@@ -487,6 +472,7 @@ pub fn insert_untarred_desktop_analysis(desktop_analysis: &Epi2meDesktopAnalysis
                     let mut components = rp.components();
                     let c = components.next().unwrap().as_os_str().to_str().unwrap();
                     rp = PathBuf::from(rp.strip_prefix(c).unwrap());
+                    log::error!("modified path == {:?}", rp);
                 } else if rp.starts_with("tmp") {
                     rp = PathBuf::from(rp.strip_prefix("tmp").unwrap());
                     // there is a presumption here that the first path element is just a ulid string from packaging cli nextflow run
@@ -498,14 +484,15 @@ pub fn insert_untarred_desktop_analysis(desktop_analysis: &Epi2meDesktopAnalysis
             } 
 
             let dest_file = PathBuf::from(&epi2meitem_x.path).join(&rp).join(PathBuf::from(&file.filename));
+            // log::error!("destination [{:?}]", dest_file);
 
             // ensure that directories have been created 
             if dest_file.parent().is_some() && !dest_file.parent().unwrap().exists() {
                 let _ = fs::create_dir_all(dest_file.parent().unwrap());
             }
-            println!("copying file [{:?}]", file_to_check);
+            log::debug!("copying file [{:?}]", file_to_check);
             let _ = fs::copy(file_to_check, dest_file);
-        }
+        
 
         // and manually add the manifest file ....
 

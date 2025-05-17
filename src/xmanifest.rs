@@ -2,10 +2,10 @@ use std::{env, fs::{self, File}, io::{BufReader, Read}, path::PathBuf};
 use data_encoding::HEXUPPER;
 use ring::digest::{Context, SHA256};
 use stringreader::StringReader;
-use tar::{Builder, Archive};
+use tar::Archive;
 use serde::{Serialize, Deserialize};
 
-use crate::{app_db::{self}, epi2me_desktop_analysis::Epi2meDesktopAnalysis, epi2me_workflow::Epi2meWorkflow, provenance::Epi2MeProvenance};
+use crate::{app_db::{self}, epi2me_desktop_analysis::Epi2meDesktopAnalysis, epi2me_workflow::Epi2meWorkflow, epi4you_errors::Epi4youError, provenance::Epi2MeProvenance};
 
 
 pub static MANIFEST_JSON: &str = "4u_manifest.json";
@@ -91,7 +91,7 @@ impl Epi2MeManifest {
         return man; 
     }
 
-    pub fn from_tarball(tarball: PathBuf) -> Option<Self> {
+    pub fn from_tarball(tarball: PathBuf) -> Result<Self, Epi4youError> {
         let mut ar = Archive::new(File::open(tarball).unwrap());
         for (_i, file) in ar.entries().unwrap().enumerate() {
             let mut file = file.unwrap();
@@ -109,15 +109,17 @@ impl Epi2MeManifest {
                         let mut epi2me_manifest: Epi2MeManifest = serde_json::from_str(&buffer).expect("error while reading json");
 
                         if epi2me_manifest.is_trusted() {
-                            return Some(epi2me_manifest);
+                            return Ok(epi2me_manifest);
                         }   else {
-                            eprintln!("checksum differences - this repository is untrusted");
+                            log::error!("checksum differences - this repository is untrusted");
+                            return Err(Epi4youError::CannotVerifyManifestAuthenticity);
                         }
                     }
                 }
             }
         }
-        return None;
+        log::error!("checksum differences - this repository is untrusted");
+        return Err(Epi4youError::CannotVerifyManifestAuthenticity);
     }
 
 
@@ -135,8 +137,8 @@ pub fn note_packaged_workflow(&mut self, id: &String) {
 }
 
 
-    pub fn untar(&mut self, tarfile: &PathBuf, temp_dir: &PathBuf) -> Option<PathBuf> {
-        println!("untar of file [{:?}] into [{:?}]", tarfile, temp_dir);
+    pub fn untar(&mut self, tarfile: &PathBuf, temp_dir: &PathBuf) -> Result<PathBuf, Epi4youError> {
+        log::info!("untar of file [{:?}] into [{:?}]", tarfile, temp_dir);
         let _ = env::set_current_dir(&temp_dir);
     
         let file = File::open(tarfile);
@@ -147,39 +149,41 @@ pub fn note_packaged_workflow(&mut self, id: &String) {
                 let unp = file.unpack_in(&temp_dir);
 
                 let fp = file.path().unwrap();
-                println!("unpacking [{:?}]", fp);
+                log::debug!("unpacking [{:?}] to [{:?}]", fp, temp_dir);
 
                 if unp.is_err() {
-                    eprintln!(" error {:?}", unp.err());
-                    return None;
+                    log::error!(" error {:?}", unp.err());
+                    return Err(Epi4youError::ErrorInUnpackingTarElement);
                 }
             }
-            return Some(temp_dir.to_owned());
+            return Ok(temp_dir.to_owned());
         }
-    
-        return None;
+        return Err(Epi4youError::ErrorInUnpackingTarElement);
     }
 
-    pub fn is_manifest_honest(&mut self, temp_dir: &PathBuf, twome: &PathBuf, _force: &bool) -> Option<Vec<Epi2MeContent>> {
-        let mut successful_content: Vec<Epi2MeContent> = Vec::new();
-        self.untar(twome, temp_dir);
-        self.src_path = String::from(temp_dir.clone().as_os_str().to_str().unwrap());
+    pub fn unpack_container_content(&mut self, temp_dir: &PathBuf, twome: &PathBuf, _force: &bool) -> Result<(), Epi4youError> {
+        self.untar(twome, temp_dir)?;
+        return Ok(());
+    }
+
+    pub fn process_container_content(&self, temp_dir: &PathBuf) -> Result<(), Epi4youError> {
+
 
         for x in &self.payload.clone() {
             match x {
                 Epi2MeContent::Epi2meWf(epi2me_workflow) => {
-                    println!("importing Workflow [{}]", epi2me_workflow.name);
+                    log::info!("importing Workflow [{}]", epi2me_workflow.name);
                     //insert_untarred_workflow(epi2me_workflow, force);
                 },
                 
                 Epi2MeContent::Epi2mePayload(desktop_analysis) => {
-                    println!("importing DesktopAnalysis [{}]", &desktop_analysis.id);
-                    app_db::insert_untarred_desktop_analysis(desktop_analysis);
+                    log::info!("importing DesktopAnalysis [{}]", &desktop_analysis.id);
+                    app_db::insert_untarred_desktop_analysis(desktop_analysis, temp_dir);
                 },
     
-    
                 Epi2MeContent::Epi2meContainer(epi2me_container) => {
-                    println!("importing Epi2meContainer");
+                    log::info!("importing Epi2meContainer [{}]", &epi2me_container.workflow);
+                    /*
                     for file in epi2me_container.files.iter() {
                         let mut pp = temp_dir.clone();
                         pp.push(file.relative_path.clone());
@@ -188,33 +192,31 @@ pub fn note_packaged_workflow(&mut self, id: &String) {
                             println!("<+> {:?}", pp);
                             let digest = sha256_digest(&pp.to_str().unwrap());  
                             if !(&digest.eq(&file.md5sum)) {
-                                eprintln!(" error checksum inconsistency - {digest}");
-                                return None;
+                                log::error!(" error checksum inconsistency - {digest}");
+                                return Err(Epi4youError::CannotVerifyManifestAuthenticity);
                             }
                             println!("checksum parity [{:?}]", digest); 
                         } else {
-                            eprintln!("<?> missing file {:?}", pp);
-                            return None;
+                            log::error!("<?> missing file {:?}", pp);
+                            return Err(Epi4youError::CannotVerifyManifestAuthenticity);
                         }
-                    }
-                    successful_content.push(x.clone());
+                    }*/
+
                 },
             }
         }
 
-        if successful_content.len() > 0 {
-            return Some(successful_content);
-        }
+        return Ok(());
 
-        eprintln!("The content within this epi4you archive cannot be trusted ....");
-        return None;
+
     }
 
 
+    
     pub fn is_trusted(&mut self) -> bool {
         let signature = self.signature.clone();
         let resignature = self.get_signature();
-        println!("looking for signature parity [{}]|[{}]", signature, resignature);
+        log::info!("looking for signature parity [{}]|[{}]", signature, resignature);
         if signature.eq(&resignature) {
             return true;
         }
@@ -256,6 +258,7 @@ pub fn note_packaged_workflow(&mut self, id: &String) {
         }
     }
 
+    /* 
     pub fn tar(&mut self, manifest: &PathBuf, twome: &PathBuf) {
         let tarfile = File::create(twome).unwrap();
         let mut a = Builder::new(tarfile);
@@ -295,7 +298,7 @@ pub fn note_packaged_workflow(&mut self, id: &String) {
             }
         }
 
-    } 
+    } */
 
 }
 

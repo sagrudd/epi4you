@@ -4,7 +4,7 @@ use polars::frame::DataFrame;
 use serde::{Deserialize, Serialize};
 use url::{Position, Url};
 use glob::glob;
-use crate::{app_db::{self, validate_db_entry}, dataframe::get_zero_val, epi2me_workflow::clip_relative_path, nextflow_log_parser::NextFlowLogs, xmanifest::{sha256_digest, FileManifest}};
+use crate::{app_db::{self, validate_db_entry, Epi2MeAnalysis}, dataframe::get_zero_val, epi2me_workflow::clip_relative_path, nextflow_log_parser::NextFlowLogs, xmanifest::{sha256_digest, FileManifest}};
 
 
 
@@ -113,6 +113,20 @@ impl Epi2meDesktopAnalysis {
             return x;
         }
         
+        pub fn as_epi2me_analysis(&self) -> Epi2MeAnalysis {
+            return Epi2MeAnalysis { 
+                id: String::from(&self.id),
+                path: String::from(&self.path),
+                name: String::from(&self.name),
+                status: String::from(&self.status),
+                workflowRepo: String::from(&self.workflowRepo),
+                workflowUser: String::from(&self.workflowUser),
+                workflowCommit: String::from(&self.workflowCommit),
+                workflowVersion: String::from(&self.workflowVersion),
+                createdAt: String::from(&self.createdAt),
+                updatedAt: String::from(&self.updatedAt),
+            };
+        }
 
 
         pub fn fish_files(&mut self, source: &PathBuf, local_prefix: &PathBuf) {

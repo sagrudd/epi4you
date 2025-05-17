@@ -477,9 +477,10 @@ pub async fn docker_agent(tempdir: &TempDir, workflows: &Vec<String>, list: &boo
     let mut manifest_pb = PathBuf::from(&tempdir.path);
     manifest_pb.push(crate::xmanifest::MANIFEST_JSON);
     manifest.write(&manifest_pb);
-    manifest.tar( 
-        &epi2me_workflow::get_relative_path(&manifest_pb, &e2.epi2path), 
-        &PathBuf::from(twome.clone().unwrap())
-    );
+    
+    //manifest.tar( 
+    //    &epi2me_workflow::get_relative_path(&manifest_pb, &e2.epi2path), 
+    //    &PathBuf::from(twome.clone().unwrap())
+    //);
 
 }

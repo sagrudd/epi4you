@@ -2,7 +2,7 @@ use std::{env, path::PathBuf};
 
 use clap::{arg, value_parser, ArgAction, ArgMatches, Command};
 
-use crate::{depme_nextflow, epi4you_errors::Epi4youError, nextflow::nextflow_toolkit::NextFlowResultFolder, tempdir::{self, TempDir}};
+use crate::{epi4you_errors::Epi4youError, nextflow::nextflow_toolkit::NextFlowResultFolder, tempdir::TempDir};
 
 
 
@@ -62,10 +62,6 @@ pub fn process_clicapture_command(args: &ArgMatches, tempdir: &TempDir) -> Resul
 
         let wf_analysis = nextflow_run_folder.verify_cli_entity(runid.as_ref().unwrap().to_string())?;
 
-
-
-        // create a working folder that will be populated
-        let tempdir = tempdir::get_tempdir()?;
 
         nextflow_run_folder.bundle_cli_run(&tempdir, wf_analysis, &twome, &force)?;
         

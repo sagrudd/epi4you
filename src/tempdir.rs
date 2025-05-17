@@ -6,7 +6,10 @@ use crate::{epi2me_db::find_db, epi4you_errors::Epi4youError};
 
 
 pub fn form_tempdir(temp_path: PathBuf) -> Option<TempDir> {
-    let tempdir = TempDir{path: PathBuf::from(&temp_path)};
+    let tempdir = TempDir{
+        path: PathBuf::from(&temp_path),
+        del: true,
+    };
     let status = create_dir_all(temp_path);
     if status.is_ok() {
         println!("using tempdir at [{}]", &tempdir);
@@ -36,13 +39,20 @@ pub fn get_tempdir() -> Result<TempDir, Epi4youError> {
 #[derive(Clone)]
 pub struct TempDir {
     pub path: PathBuf,
+    del: bool,
+}
+
+impl TempDir {
+    pub fn keep(&mut self) {
+        self.del = false;
+    }
 }
 
 impl Drop for TempDir {
     fn drop(&mut self) {
         let str = self.path.as_os_str().to_str().unwrap();
         // if has been cloned then may not exist -- test for this
-        if self.path.exists() {
+        if self.path.exists() && self.del {
             println!("Dropping TempDir with path `{}`!", str);
             let cleanup = fs::remove_dir_all(&self.path);
             if cleanup.is_err() {

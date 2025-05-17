@@ -32,9 +32,11 @@ impl NextFlowLogs {
             }*/
             if line.contains(url_str_key) {
                 log::error!("{line}");
-    
-                name = &line[line.find("[").unwrap()+1..line.find("]").unwrap()];
-                revision = &line[line.find(revision_key).unwrap()+revision_key.len()..];
+
+                let clipped_line = &line[line.find(url_str_key).unwrap()+url_str_key.len()..];
+
+                name = &clipped_line[clipped_line.find("[").unwrap()+1..clipped_line.find("]").unwrap()];
+                revision = &clipped_line[clipped_line.find(revision_key).unwrap()+revision_key.len()..];
                 revision = &revision[..revision.find(" ").unwrap()];
                 let mut url_str = &line[line.find(url_str_key).unwrap()+url_str_key.len()..];
                 url_str = &url_str[..url_str.find("`").unwrap()];

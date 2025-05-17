@@ -4,6 +4,7 @@ use create_2me::create_from_cli_run;
 use env_logger::Env;
 use epi2me_db::epi2me_manager;
 use epi4you_errors::Epi4youError;
+use importer::import_from_2me;
 use workflow::workflow_manager;
 
 mod app_db;
@@ -21,7 +22,6 @@ mod workflow;
 mod settings;
 
 mod docker;
-mod ximporter;
 mod xmanifest;
 mod xnf_parser;
 mod xworkflows;
@@ -38,6 +38,10 @@ pub mod epi4you_errors;
 pub mod create_2me {
     pub mod create_from_cli_run;
     pub mod create_from_nf_artefact;
+}
+
+pub mod importer {
+    pub mod import_from_2me;
 }
 
 pub mod nextflow {
@@ -128,16 +132,7 @@ enum Datatypes {
         force: bool,
     },
 
-    /// import .2me format tar archive
-    Import {
-        /// filepath to the .2me file to import
-        #[arg(short, long)]
-        twome: Option<String>,
 
-        /// force overwrite of exising twome archive
-        #[arg(short, long, action=ArgAction::SetTrue)]
-        force: bool,
-    },
 
     /// interaction and bundling of CLI-based nextflow artifacts
     NextflowArtifact {
@@ -210,11 +205,14 @@ async fn main() {
         eprintln!("error creating tempdir - aborting!");
         return;
     }
+    let mut temp_dir = tempdir.ok().unwrap();
+    temp_dir.keep();
 
     let use_args: Vec<Arg> = Vec::<Arg>::new();
     let mut subcmds: Vec<Command> = Vec::<Command>::new();
 
     subcmds.push(create_from_cli_run::get_cli_setup());
+    subcmds.push(import_from_2me::get_cli_setup());
 
     let app = Command::new(epi4you::APPLICATION_NAME)
     .subcommand_required(false)
@@ -233,7 +231,10 @@ async fn main() {
 
         if cmdkeys.contains(&create_from_cli_run::NEXTFLOW_RUN) && xargs.as_ref().ok().unwrap().subcommand_matches(create_from_cli_run::NEXTFLOW_RUN).is_some()  { 
             log::debug!("subcommand [{}] has been called", create_from_cli_run::NEXTFLOW_RUN);
-            status = create_from_cli_run::process_clicapture_command(&xargs.ok().unwrap().subcommand_matches(create_from_cli_run::NEXTFLOW_RUN).unwrap(), &mut tempdir.ok().unwrap());
+            status = create_from_cli_run::process_clicapture_command(&xargs.ok().unwrap().subcommand_matches(create_from_cli_run::NEXTFLOW_RUN).unwrap(), &mut temp_dir);
+        } else if cmdkeys.contains(&import_from_2me::IMPORT2ME) && xargs.as_ref().ok().unwrap().subcommand_matches(import_from_2me::IMPORT2ME).is_some()  { 
+            log::debug!("subcommand [{}] has been called", import_from_2me::IMPORT2ME);
+            status = import_from_2me::process_2me_import_command(&xargs.ok().unwrap().subcommand_matches(import_from_2me::IMPORT2ME).unwrap(), &mut temp_dir).await;
         } else {
             status = malformed_cli();
         }
@@ -289,10 +290,6 @@ async fn main() {
             }
         },
 
-        Some(Datatypes::Import { twome, force}) => {
-            //import_manager(twome, force).await;
-            ximporter::import_coordinator(&tempdir.unwrap().path, twome, force).await;
-        },
 
         None => {}
     }

@@ -8,6 +8,9 @@ use serde::Serialize;
 pub enum Epi4youError {
 
     AdditionalParameterRequired,
+    CannotVerifyManifestAuthenticity,
+    Epi4youMissingRequired2MEartefact,
+    ErrorInUnpackingTarElement,
     FailedToCreateFolder(PathBuf),
     FailedToParseFileContent,
     FileAlreadyExistsUnforcedExecution(PathBuf),
@@ -20,5 +23,6 @@ pub enum Epi4youError {
     RequiredPathMissing(PathBuf),
     SpecifiedNextflowRunNotFound(String),
     UnableToLocateNextflowBinary,
+    UnableToResolveManifestObject,
     
 }
