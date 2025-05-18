@@ -20,7 +20,7 @@ impl NextFlowLogs {
         let url_str_key = r"Launching `";
         let mut project = String::from("");
         let mut pname = String::from("");
-        let mut version = String::from("");
+        let mut version = String::from("dev");
         let xxxkey = "||||||||||";
 
         //let re = Regex::new(r#"^\|+"#).unwrap();
@@ -59,8 +59,10 @@ impl NextFlowLogs {
             } else if line.contains(xxxkey) && line.contains(&pname) {
                 log::error!("extracting vers from [{}]", line);
                 let v = line[line.find(&pname).unwrap()+pname.len()..].trim();
-                version = String::from(&v[.. v.find("-").unwrap()]);
-                //println!("{v}");
+                if v.contains("-") {
+                    let vstr = &v[.. v.find("-").unwrap()];
+                    version = String::from(vstr);
+                }
             }
         }
 
