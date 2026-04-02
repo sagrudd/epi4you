@@ -1,6 +1,12 @@
 # epi4you
 Some data wrangling for the EPI2ME desktop environment
 
+## Documentation
+
+Project documentation is published with Sphinx at:
+
+https://sagrudd.github.io/epi4you/
+
 ## Headline features
 
 The ambition for this application was a toolkit to faciliate the export and import of analyses
