@@ -1,3 +1,11 @@
+//! High-level orchestration for converting CLI Nextflow runs into `.2me`
+//! archives.
+//!
+//! EPI2ME Desktop workflows are built on top of Nextflow, but Desktop stores
+//! additional metadata and presentation files around the raw workflow output.
+//! This module is the adapter that starts from a plain `nextflow log` view and
+//! progressively reconstructs enough EPI2ME-shaped state for import.
+
 use std::{fs, io::Cursor, path::PathBuf, process::Command};
 
 use ulid::Ulid;
@@ -14,6 +22,13 @@ use crate::{
     tempdir::TempDir,
 };
 
+/// Snapshot of a directory that contains one or more local Nextflow runs.
+///
+/// The struct owns:
+///
+/// - the directory we will inspect,
+/// - the resolved `nextflow` binary used to inspect it, and
+/// - parsed `nextflow log` rows that represent successful candidate runs.
 pub struct NextFlowResultFolder {
     folder: PathBuf,
     nxf_bin: PathBuf,
@@ -21,6 +36,10 @@ pub struct NextFlowResultFolder {
 }
 
 impl NextFlowResultFolder {
+    /// Builds a run index for a Nextflow working directory.
+    ///
+    /// In the broader project, this is the entry point for "take a CLI run and
+    /// make it look enough like an EPI2ME Desktop run that we can bundle it".
     pub fn init(folder: PathBuf, nxf_bin: Option<String>) -> Result<Self, Epi4youError> {
         if !folder.exists() {
             return Err(Epi4youError::RequiredPathMissing(folder));
@@ -38,6 +57,10 @@ impl NextFlowResultFolder {
         Ok(folder)
     }
 
+    /// Resolves the `nextflow` executable that should be used for discovery.
+    ///
+    /// A caller may pass an explicit path, but in normal workstation usage we
+    /// fall back to `which nextflow`.
     fn get_nextflow_path(nxf_bin: Option<String>) -> Result<PathBuf, Epi4youError> {
         log::info!("getting nextflow path ...");
 
@@ -83,6 +106,10 @@ impl NextFlowResultFolder {
         }
     }
 
+    /// Executes `nextflow log` and retains only successful run records.
+    ///
+    /// The resulting in-memory index is what powers `--list` and `--runid`
+    /// selection in the CLI capture flow.
     fn parse_nextflow_folder(&mut self) -> Result<(), Epi4youError> {
         log::info!(
             "Looking for nxf artifacts at [{}]",
@@ -116,11 +143,16 @@ impl NextFlowResultFolder {
         Ok(())
     }
 
+    /// Prints the discovered successful runs in tabular form.
     pub fn list_runs(&self) {
         let df = nextflow_vec_to_df(self.vec.clone());
         dataframe::print_polars_df(&df);
     }
 
+    /// Finds one parsed run by its Nextflow run name.
+    ///
+    /// `epi4you` uses the Nextflow `run_name` as the CLI-facing identifier for
+    /// packaging a historical run into a Desktop-compatible bundle.
     pub fn verify_cli_entity(&self, runid: String) -> Result<NxfLogItem, Epi4youError> {
         self.vec
             .iter()
@@ -129,6 +161,14 @@ impl NextFlowResultFolder {
             .ok_or(Epi4youError::SpecifiedNextflowRunNotFound(runid))
     }
 
+    /// Bundles one selected CLI run as a `.2me` archive.
+    ///
+    /// Conceptually this method performs four translations:
+    ///
+    /// 1. locate the real analysis output directory,
+    /// 2. distill the Nextflow log into EPI2ME-like helper files,
+    /// 3. stage output files into a temporary EPI2ME-style layout, and
+    /// 4. delegate final manifest/tar creation to the bundle layer.
     pub fn bundle_cli_run(
         &self,
         temp_dir: &TempDir,

@@ -1,3 +1,11 @@
+//! Representation of an EPI2ME Desktop analysis record.
+//!
+//! Oxford Nanopore's EPI2ME Desktop experience is more than a plain results
+//! folder: analyses also have GUI-facing metadata such as workflow identity,
+//! timestamps, status, and provenance. This module captures that shape so a
+//! bundled analysis can be exported from or imported into a Desktop-like
+//! environment.
+
 use std::{env, path::PathBuf};
 
 use crate::{
@@ -10,21 +18,35 @@ use crate::{
 use glob::glob;
 use polars::frame::DataFrame;
 use serde::{Deserialize, Serialize};
-use url::{Position, Url};
-
+/// Serializable model of one Desktop analysis entry.
+///
+/// The field names intentionally follow the application's existing mixed-case
+/// schema so the JSON and database-adjacent layers can interoperate without a
+/// translation table.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[allow(non_snake_case)]
 pub struct Epi2meDesktopAnalysis {
+    /// Stable analysis identifier used by the GUI and local database.
     pub id: String,
+    /// On-disk location of the analysis root.
     pub path: String,
+    /// Human-readable Nextflow run name shown in EPI2ME Desktop.
     pub name: String,
+    /// Final workflow status as expected by the Desktop UI.
     pub status: String,
+    /// Workflow repository name, for example `wf-human-variation`.
     pub workflowRepo: String,
+    /// Workflow owner or project namespace, often `epi2me-labs`.
     pub workflowUser: String,
+    /// Workflow revision / commit recorded for the run.
     pub workflowCommit: String,
+    /// User-facing workflow version derived from logs or local metadata.
     pub workflowVersion: String,
+    /// Analysis creation timestamp.
     pub createdAt: String,
+    /// Analysis update timestamp.
     pub updatedAt: String,
+    /// File inventory used when bundling this analysis.
     pub files: Vec<FileManifest>,
 }
 
@@ -50,6 +72,10 @@ impl Default for Epi2meDesktopAnalysis {
     */
 
 impl Epi2meDesktopAnalysis {
+    /// Rehydrates an analysis description from the local Desktop database view.
+    ///
+    /// This path is used when `epi4you` is bundling an analysis that already
+    /// exists in the EPI2ME Desktop environment.
     pub fn from_run_id(runid: &String, polardb: &DataFrame) -> Self {
         if validate_db_entry(runid, polardb) {
             let stacked = app_db::get_db_id_entry(runid, polardb).unwrap();
@@ -73,6 +99,11 @@ impl Epi2meDesktopAnalysis {
         panic!();
     }
 
+    /// Synthesizes a Desktop-style analysis record from a raw CLI Nextflow run.
+    ///
+    /// This is one of the most important translation points in the project:
+    /// there is no native EPI2ME database row here yet, so we infer the fields
+    /// that Desktop expects from `nextflow.stdout` and the staged bundle path.
     pub fn init(
         ulid_str: &String,
         source: &PathBuf,
@@ -115,6 +146,7 @@ impl Epi2meDesktopAnalysis {
         return x;
     }
 
+    /// Converts the export/import model into the database-oriented app model.
     pub fn as_epi2me_analysis(&self) -> Epi2MeAnalysis {
         return Epi2MeAnalysis {
             id: String::from(&self.id),
@@ -130,6 +162,10 @@ impl Epi2meDesktopAnalysis {
         };
     }
 
+    /// Recursively inventories analysis files for bundling.
+    ///
+    /// Files are recorded relative to `local_prefix` so the tarball can later be
+    /// reconstructed without baking absolute workstation paths into the archive.
     pub fn fish_files(&mut self, source: &PathBuf, local_prefix: &PathBuf) {
         let globpat = &source.clone().into_os_string().into_string().unwrap();
         let result = [&globpat, "/**/*.*"].join("");
@@ -174,10 +210,12 @@ impl Epi2meDesktopAnalysis {
         }
     }
 
+    /// Returns the current file manifest vector.
     pub fn get_files(&self) -> Vec<FileManifest> {
         return self.files.clone();
     }
 
+    /// Returns the total payload size of all inventoried files.
     pub fn get_files_size(&self) -> u64 {
         let mut size: u64 = 0;
         for file in self.files.clone() {

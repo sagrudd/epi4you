@@ -1,3 +1,10 @@
+//! CLI entry point for packaging an existing CLI Nextflow run as a `.2me`
+//! archive.
+//!
+//! This flow exists because some users run EPI2ME workflows directly with
+//! Nextflow and only later want the portability or GUI import experience that
+//! EPI2ME Desktop provides.
+
 use std::{env, path::PathBuf};
 
 use clap::{arg, value_parser, ArgAction, ArgMatches, Command};
@@ -7,8 +14,10 @@ use crate::{
     tempdir::TempDir,
 };
 
+/// CLI subcommand name for packaging CLI Nextflow runs.
 pub const NEXTFLOW_RUN: &str = "nextflow-run";
 
+/// Returns the clap configuration for the CLI-run capture command.
 pub fn get_cli_setup() -> Command {
     let my_command = Command::new(NEXTFLOW_RUN)
         .about("create 2me from nextflow cli results")
@@ -41,6 +50,12 @@ pub fn get_cli_setup() -> Command {
     return my_command;
 }
 
+/// Executes the CLI-run capture flow.
+///
+/// Depending on the arguments this either:
+///
+/// - lists successful runs discovered via `nextflow log`, or
+/// - packages one selected run into a `.2me` archive.
 pub fn process_clicapture_command(
     args: &ArgMatches,
     tempdir: &TempDir,

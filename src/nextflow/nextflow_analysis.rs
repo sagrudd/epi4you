@@ -1,3 +1,10 @@
+//! Helpers for turning one parsed Nextflow run into a staged analysis payload.
+//!
+//! EPI2ME Desktop stores more than "just the output directory": it also keeps
+//! lightweight status and progress artefacts that make a completed analysis
+//! browsable in the GUI. These helpers reconstruct enough of that surrounding
+//! shape for `epi4you` imports and exports.
+
 use std::{
     collections::HashMap,
     fs,
@@ -13,6 +20,10 @@ use super::{
     nextflow_progress::{ProgressItem, ProgressJson},
 };
 
+/// Resolved view of one Nextflow analysis on disk.
+///
+/// This type couples the `nextflow log` row with the concrete directories and
+/// derived helper files we need to build a bundle.
 pub struct NextflowAnalysis {
     wf_analysis: NxfLogItem,
     src_dir: PathBuf,
@@ -20,6 +31,11 @@ pub struct NextflowAnalysis {
 }
 
 impl NextflowAnalysis {
+    /// Resolves the output directory associated with a log row.
+    ///
+    /// The preferred source of truth is the original command line, especially
+    /// `--out_dir` / `--out-dir`. If that cannot be recovered, we fall back to
+    /// the common EPI2ME-style `output/` convention.
     pub fn init(wf_analysis: NxfLogItem, analysis_folder: PathBuf) -> Result<Self, Epi4youError> {
         log::info!("processing command [{:?}]", &wf_analysis.command);
 
@@ -36,10 +52,16 @@ impl NextflowAnalysis {
         })
     }
 
+    /// Returns the resolved analysis output directory.
     pub fn get_analysis_dir(&self) -> PathBuf {
         self.folder.clone()
     }
 
+    /// Locates the `.nextflow.log*` file that belongs to this run.
+    ///
+    /// Multiple logs may exist after repeated runs in the same directory. We
+    /// choose the one that mentions the specific `run_name` and then copy it
+    /// into the temporary staging area under the stable name `nextflow.log`.
     pub fn locate_nextflow_log(&self, tmp_dir: &PathBuf) -> Result<String, Epi4youError> {
         log::info!("locating nextflow logs ...");
 
@@ -82,6 +104,12 @@ impl NextflowAnalysis {
         }
     }
 
+    /// Distills the full Nextflow log into the subset EPI2ME-style metadata
+    /// extraction cares about.
+    ///
+    /// The resulting text is written as `nextflow.stdout` because downstream
+    /// parsing logic only needs the user-facing launch and task submission
+    /// lines, not the entire debug-oriented Nextflow log.
     pub fn extract_log_stdout(
         &self,
         nf_log: &str,
@@ -124,6 +152,11 @@ impl NextflowAnalysis {
         Ok(cache)
     }
 
+    /// Builds a compact `progress.json` file from submitted-process lines.
+    ///
+    /// This mirrors the sort of task summary EPI2ME Desktop presents in its UI.
+    /// It is intentionally lossy: the goal is to recover a useful final
+    /// completed-process picture rather than every transient scheduler event.
     pub fn prepare_progress_json(
         &self,
         nextflow_stdout: &str,
@@ -179,6 +212,7 @@ impl NextflowAnalysis {
     }
 }
 
+/// Attempts to resolve the analysis directory from the original CLI command.
 fn resolve_analysis_dir(command: &str, analysis_folder: &Path) -> Option<PathBuf> {
     let output_dir = parse_output_dir(command)?;
     let candidate = analysis_folder.join(output_dir);
@@ -190,6 +224,7 @@ fn resolve_analysis_dir(command: &str, analysis_folder: &Path) -> Option<PathBuf
     }
 }
 
+/// Falls back to the common `output/` directory used by many EPI2ME workflows.
 fn fallback_output_dir(analysis_folder: &Path) -> Option<PathBuf> {
     let candidate = analysis_folder.join("output");
     if candidate.exists() && candidate.is_dir() {
@@ -199,6 +234,10 @@ fn fallback_output_dir(analysis_folder: &Path) -> Option<PathBuf> {
     }
 }
 
+/// Parses supported output-directory flags from a Nextflow command line.
+///
+/// Supporting both `--out_dir` and `--out-dir` lets the code tolerate
+/// historical differences between workflow parameter styles.
 fn parse_output_dir(command: &str) -> Option<&str> {
     const KEYS: [&str; 4] = ["--out_dir=", "--out-dir=", "--out_dir", "--out-dir"];
 
@@ -224,6 +263,7 @@ fn parse_output_dir(command: &str) -> Option<&str> {
     None
 }
 
+/// Returns the full text of a candidate log if it belongs to the named run.
 fn get_matched_nexflow_log(cand_logfile: &PathBuf, run_name: &str) -> Option<String> {
     let content = fs::read_to_string(cand_logfile).ok()?;
     content.contains(run_name).then_some(content)

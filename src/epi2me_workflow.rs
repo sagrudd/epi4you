@@ -1,3 +1,9 @@
+//! Representation of an installed EPI2ME workflow tree.
+//!
+//! EPI2ME Desktop distributes workflows as versioned filesystem payloads.
+//! `epi4you` can package those workflow assets directly so they can travel with
+//! an analysis archive or be reinstalled elsewhere.
+
 use std::{env, path::PathBuf};
 
 use crate::{
@@ -7,16 +13,22 @@ use crate::{
 use glob::glob;
 use serde::{Deserialize, Serialize};
 
+/// Serializable description of one installed workflow and its files.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[allow(non_snake_case)]
 pub struct Epi2meWorkflow {
+    /// Workflow namespace / project, typically something like `epi2me-labs`.
     pub project: String,
+    /// Workflow name under that namespace.
     pub name: String,
+    /// Version string associated with the installed workflow.
     pub version: String,
+    /// Files that make up the workflow installation tree.
     pub files: Vec<FileManifest>,
 }
 
 impl Epi2meWorkflow {
+    /// Creates an empty workflow payload descriptor.
     pub fn init(p: &String, n: &String, v: &String) -> Self {
         return Epi2meWorkflow {
             project: String::from(p),
@@ -28,6 +40,8 @@ impl Epi2meWorkflow {
 
     // let wf_path = check_defined_wfdir_exists(&local_prefix, &project, &name);
 
+    /// Resolves the canonical on-disk folder for this workflow beneath an
+    /// EPI2ME installation root.
     pub fn check_defined_wfdir_exists(&self, wfdir: &PathBuf) -> Option<PathBuf> {
         let mut x = wfdir.clone();
         x.push(String::from("workflows"));
@@ -41,6 +55,10 @@ impl Epi2meWorkflow {
         return None;
     }
 
+    /// Builds and populates a workflow descriptor from a local installation.
+    ///
+    /// If `wf_path` is not supplied, the function falls back to the local
+    /// EPI2ME installation discovered by the project.
     pub fn path_init(
         wf_path: Option<&PathBuf>,
         project: &String,
@@ -65,6 +83,7 @@ impl Epi2meWorkflow {
         return vehicle;
     }
 
+    /// Recursively inventories workflow files beneath the workflow directory.
     fn fish_files(&mut self, source: &PathBuf, local_prefix: &PathBuf) {
         let globpat = &source.clone().into_os_string().into_string().unwrap();
         let result = [&globpat, "/**/*.*"].join("");
@@ -109,10 +128,12 @@ impl Epi2meWorkflow {
         }
     }
 
+    /// Returns the workflow file inventory.
     pub fn get_files(&self) -> Vec<FileManifest> {
         return self.files.clone();
     }
 
+    /// Returns the total size of all inventoried workflow files.
     pub fn get_files_size(&self) -> u64 {
         let mut size: u64 = 0;
         for file in self.files.clone() {
@@ -122,12 +143,14 @@ impl Epi2meWorkflow {
     }
 }
 
+/// Returns the relative parent directory that should contain a given file.
 pub fn clip_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
     let mut relative_path = get_relative_path(e, local_prefix);
     let _ = relative_path.pop();
     return relative_path;
 }
 
+/// Returns the path of `e` relative to the supplied EPI2ME installation root.
 pub fn get_relative_path(e: &PathBuf, local_prefix: &PathBuf) -> PathBuf {
     //println!("relativePath {:?} from lp {:?} ...", e, local_prefix);
     PathBuf::from(e.strip_prefix(local_prefix).unwrap())

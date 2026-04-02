@@ -1,17 +1,34 @@
+//! Parsing helpers for extracting EPI2ME-relevant metadata from `nextflow`
+//! textual logs.
+//!
+//! The EPI2ME Desktop UI ultimately wants workflow identity information such as
+//! repository, revision, version, and run name. When bundling raw CLI runs we
+//! do not have the Desktop database record, so we recover that information from
+//! the preserved Nextflow output instead.
+
 use std::collections::HashMap;
 
 use url::{Position, Url};
 
+/// Default workflow version when the log does not expose one clearly.
 const DEFAULT_VERSION: &str = "dev";
+/// Marker used by Nextflow's launch line in the stdout/log text we keep.
 const LAUNCH_PREFIX: &str = "Launching `";
+/// Text preceding the workflow revision token.
 const REVISION_KEY: &str = " - revision: ";
+/// Sentinel found in lines that expose version text in preserved stdout.
 const VERSION_MARKER: &str = "||||||||||";
 
+/// Small metadata bag extracted from a Nextflow launch transcript.
+///
+/// The keys intentionally mirror the fields that `epi4you` later uses to build
+/// an [`Epi2meDesktopAnalysis`](crate::epi2me_desktop_analysis::Epi2meDesktopAnalysis).
 pub struct NextFlowLogs {
     facet: HashMap<String, String>,
 }
 
 impl NextFlowLogs {
+    /// Parses a reduced `nextflow.stdout` transcript into named metadata values.
     pub fn init(log: &str) -> Self {
         let mut facet = HashMap::<String, String>::new();
 
@@ -44,10 +61,12 @@ impl NextFlowLogs {
         NextFlowLogs { facet }
     }
 
+    /// Returns one parsed value or an empty string if absent.
     pub fn get_value(&self, key: &str) -> String {
         self.facet.get(key).cloned().unwrap_or_default()
     }
 
+    /// Emits all parsed key/value pairs to the logger for debugging.
     pub fn test(&self) {
         for (k, v) in self.facet.iter() {
             log::debug!("{k}\t\t{v}");
@@ -55,6 +74,7 @@ impl NextFlowLogs {
     }
 }
 
+/// Structured representation of one launch line.
 #[derive(Debug, PartialEq, Eq)]
 struct LaunchLine {
     name: String,
@@ -63,6 +83,7 @@ struct LaunchLine {
     pname: String,
 }
 
+/// Parses the Nextflow "Launching ..." line into its core identifiers.
 fn parse_launch_line(line: &str) -> Option<LaunchLine> {
     let clipped_line = line.split_once(LAUNCH_PREFIX)?.1;
     let url_str = clipped_line.split('`').next()?;
@@ -91,6 +112,11 @@ fn parse_launch_line(line: &str) -> Option<LaunchLine> {
     })
 }
 
+/// Extracts `{project, workflow}` from either a full URL or a shorthand tuple.
+///
+/// EPI2ME workflows are commonly referenced as GitHub paths such as
+/// `epi2me-labs/wf-human-variation`, but some logs collapse this to a shorter
+/// workflow-only form. The fallback keeps `epi4you` useful in both cases.
 fn parse_project_and_name(url_str: &str) -> (String, String) {
     if let Ok(url) = Url::parse(url_str) {
         let data_url_payload = &url[Position::AfterHost..].trim_start_matches('/');
@@ -103,6 +129,7 @@ fn parse_project_and_name(url_str: &str) -> (String, String) {
     ("epi2me-labs".to_string(), fallback_name)
 }
 
+/// Extracts a simplified workflow version token from a log line.
 fn parse_version(line: &str, pname: &str) -> String {
     line.split_once(pname)
         .map(|(_, suffix)| suffix.trim())

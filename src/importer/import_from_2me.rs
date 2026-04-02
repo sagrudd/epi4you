@@ -1,11 +1,19 @@
+//! CLI entry point for importing `.2me` archives.
+//!
+//! This is the inverse of the bundling flow: it validates the archive, unpacks
+//! it into temporary storage, and then lets the manifest dispatch the payload
+//! into local EPI2ME-shaped structures.
+
 use std::path::PathBuf;
 
 use clap::{arg, value_parser, ArgAction, ArgMatches, Command};
 
 use crate::{epi4you_errors::Epi4youError, tempdir::TempDir, xmanifest};
 
+/// CLI subcommand name used for `.2me` import.
 pub const IMPORT2ME: &str = "import";
 
+/// Returns the clap configuration for the archive import subcommand.
 pub fn get_cli_setup() -> Command {
     let my_command = Command::new(IMPORT2ME)
         .about("import .2me format tar archive")
@@ -19,6 +27,11 @@ pub fn get_cli_setup() -> Command {
     return my_command;
 }
 
+/// Executes archive import from CLI arguments.
+///
+/// The import is intentionally staged through a temporary directory so manifest
+/// verification and file placement happen before the local installation is
+/// modified.
 pub async fn process_2me_import_command(
     args: &ArgMatches,
     tempdir: &TempDir,
