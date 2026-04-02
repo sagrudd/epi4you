@@ -85,7 +85,11 @@ then routes the payload into local EPI2ME-style storage.
 Install Sphinx docs locally
 ---------------------------
 
-To build this documentation locally:
+``cargo build`` is now wired to generate the Sphinx documentation as part of the
+build process. The build tries local ``sphinx-build`` first and then falls back
+to a dedicated AlmaLinux 9 container image defined in ``docs/Dockerfile.docs``.
+
+To build the documentation directly yourself:
 
 .. code-block:: bash
 
@@ -95,6 +99,12 @@ To build this documentation locally:
    make -C docs html
 
 The generated HTML will be in ``docs/build/html``.
+
+If you explicitly need to skip documentation generation for one build, set:
+
+.. code-block:: bash
+
+   EPI4YOU_SKIP_DOCS=1 cargo build
 
 What to read next
 -----------------

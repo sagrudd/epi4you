@@ -29,6 +29,7 @@ This documentation is organized around that use case:
    cli
    archive-format
    architecture
+   developer-docs
 
 Indices and tables
 ==================
