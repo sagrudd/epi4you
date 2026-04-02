@@ -51,3 +51,17 @@ Relevant files
 * ``docs/Dockerfile.docs``
 * ``docs/Makefile``
 * ``docs/requirements.txt``
+* ``.github/workflows/pages.yml``
+
+Publishing to GitHub Pages
+--------------------------
+
+The repository includes a GitHub Actions workflow that:
+
+* installs Python and Sphinx,
+* runs ``cargo build``,
+* collects ``docs/build/html``, and
+* deploys that artifact to GitHub Pages.
+
+You may still need to enable Pages in the repository settings so GitHub treats
+``GitHub Actions`` as the publication source for the site.

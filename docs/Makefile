@@ -16,6 +16,7 @@ clean:
 
 html:
 	@$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+	@touch "$(BUILDDIR)/html/.nojekyll"
 
 Makefile:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
