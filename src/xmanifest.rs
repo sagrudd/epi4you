@@ -221,13 +221,6 @@ impl Epi2MeManifest {
         self.provenance.push(prov);
     }
 
-    /// Appends provenance describing the packaging of a workflow payload.
-    pub fn note_packaged_workflow(&mut self, id: &String) {
-        let action = vec![String::from("workflow_bundled"), String::from(id)].join(": ");
-        let prov = Epi2MeProvenance::init(action, None);
-        self.provenance.push(prov);
-    }
-
     /// Extracts the archive into a temporary working directory.
     ///
     /// Import happens in a scratch directory first so later steps can validate
@@ -339,11 +332,6 @@ impl Epi2MeManifest {
     pub fn to_string(&mut self) -> String {
         self.sign();
         serde_json::to_string_pretty(self).unwrap()
-    }
-
-    /// Pretty-prints the signed manifest for debugging.
-    pub fn print(&mut self) {
-        println!("{}", self.to_string());
     }
 
     /// Writes the signed manifest to disk.

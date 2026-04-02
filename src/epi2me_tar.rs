@@ -1,4 +1,4 @@
-use std::{env, fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf};
 
 use tar::Builder;
 
@@ -13,17 +13,15 @@ pub fn tar(
     let tarfile = File::create(tarfile).unwrap();
     let mut a = Builder::new(tarfile);
 
-    let epi2db = epi2me_db::find_db();
     let mut local_prefix = PathBuf::from("/");
     if wf_path.is_some() {
         local_prefix = wf_path.unwrap().to_owned();
-    } else if epi2db.is_some() {
-        local_prefix = epi2db.unwrap().epi2path;
+    } else if let Some(epi2db) = epi2me_db::find_db() {
+        local_prefix = epi2db.epi2path;
     }
-    let _ = env::set_current_dir(&local_prefix);
 
     for file in files {
-        let mut file_to_tar = PathBuf::from(file.relative_path.clone());
+        let mut file_to_tar = local_prefix.join(&file.relative_path);
         file_to_tar.push(&file.filename);
 
         println!(
@@ -35,7 +33,6 @@ pub fn tar(
     }
 
     println!("writing manifest {:?}", manifest);
-    //let _ = env::set_current_dir(&manifest.parent().unwrap());
     let _ = a.append_path(manifest);
 }
 

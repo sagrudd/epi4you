@@ -28,13 +28,11 @@ fn main() {
     let docs_build = docs_dir.join("build");
 
     if build_docs_with_sphinx(&docs_source, &docs_build) {
-        println!("cargo:warning=Built Sphinx documentation with local sphinx-build");
         return;
     }
 
     for engine in ["docker", "podman"] {
         if build_docs_with_container(engine, &manifest_dir, &docs_dir) {
-            println!("cargo:warning=Built Sphinx documentation with {engine}");
             return;
         }
     }

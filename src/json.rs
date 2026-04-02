@@ -1,49 +1,17 @@
-use serde::{Deserialize, Serialize};
-use serde_json;
-use std::fs::File;
-use std::path::PathBuf;
+use serde::Deserialize;
+use std::{fs::File, path::PathBuf};
 
-extern crate serde;
-
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[allow(non_snake_case)]
 struct SomeDataType {
     workingDirectory: String,
-    //globalConfig: String,
-    //dockerPath: String,
-    //expandInstances: bool,
-    //expandWorkflows: bool,
-    //localId: String
 }
 
 pub fn config_json(path_buf: &PathBuf) -> String {
     let json_file = File::open(path_buf).expect("file not found");
-
     let epi2me_setup: SomeDataType =
         serde_json::from_reader(json_file).expect("error while reading json");
 
     println!("\tjson parsed [workDir={}]", epi2me_setup.workingDirectory);
-    return epi2me_setup.workingDirectory;
+    epi2me_setup.workingDirectory
 }
-
-/*
-
-pub fn write_manifest_str(manifest: &Epi2MeManifest, destination: &PathBuf) {
-    println!("writing manifest to path [{:?}]", destination);
-    let x = fs::write(destination, get_manifest_str(manifest));
-    if x.is_err() {
-        println!("Error with writing manifest to file");
-    }
-}
-
-
-pub fn get_manifest_str(manifest: &Epi2MeManifest) -> String {
-    serde_json::to_string_pretty(&manifest).unwrap()
-}
-
-
-pub fn wrangle_manifest(manifest: &Epi2MeManifest) {
-    println!("{}", get_manifest_str(manifest));
-}
-
-    */
