@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use serde::{ser::SerializeMap, Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProgressItem {
     pub status: String,
     pub tag: String,
@@ -29,4 +28,3 @@ impl Serialize for ProgressJson {
         struct_ser.end()
     }
 }
-

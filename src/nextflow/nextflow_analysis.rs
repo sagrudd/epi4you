@@ -1,9 +1,17 @@
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
+
+use glob::glob;
 
 use crate::epi4you_errors::Epi4youError;
-use glob::glob;
-use super::{nextflow_log_item::NxfLogItem, nextflow_progress::{ProgressItem, ProgressJson}};
 
+use super::{
+    nextflow_log_item::NxfLogItem,
+    nextflow_progress::{ProgressItem, ProgressJson},
+};
 
 pub struct NextflowAnalysis {
     wf_analysis: NxfLogItem,
@@ -11,252 +19,266 @@ pub struct NextflowAnalysis {
     folder: PathBuf,
 }
 
-
 impl NextflowAnalysis {
-
     pub fn init(wf_analysis: NxfLogItem, analysis_folder: PathBuf) -> Result<Self, Epi4youError> {
+        log::info!("processing command [{:?}]", &wf_analysis.command);
 
+        let candidate = resolve_analysis_dir(&wf_analysis.command, &analysis_folder)
+            .or_else(|| fallback_output_dir(&analysis_folder))
+            .ok_or(Epi4youError::NextflowAnalysisFolderNotFound)?;
 
-            let command = &wf_analysis.command;
-            log::info!("processing command [{:?}]", &command);
-        
-            let hooks = vec![" --out_dir "];
-            let nextfield = " -";
-            for hook in hooks {
-                if command.contains(&hook) {
-                    log::debug!("filtering on [{}]", &hook);
-                    let mut index = command.find(&hook).unwrap();
-                    index += &hook.len();
-                    let mut substr = command[index..].trim();
-                    log::debug!("substr == {}", substr);
-                    // let's further filter on the next parameter ...
-                    if substr.contains(nextfield) {
-                        index = substr.find(nextfield).unwrap();
-                        substr = &substr[..index].trim();
-                        log::debug!("substr == {}", substr);
-                    }
-        
-                    let mut test_dir = analysis_folder.to_owned();
-                    test_dir.push(substr);
-        
-                    if test_dir.exists() && test_dir.is_dir() {
-                        log::info!("we have a candidate folder at [{:?}]", test_dir);
+        log::info!("using analysis folder [{:?}]", candidate);
 
-                        let analysis = NextflowAnalysis {
-                            wf_analysis,
-                            src_dir: analysis_folder,
-                            folder: test_dir,
-                        };
-                        return Ok(analysis);
-                    } 
-                }
-            }
-            return Err(Epi4youError::NextflowAnalysisFolderNotFound);
-        
-
-
+        Ok(NextflowAnalysis {
+            wf_analysis,
+            src_dir: analysis_folder,
+            folder: candidate,
+        })
     }
 
     pub fn get_analysis_dir(&self) -> PathBuf {
-        return self.folder.clone();
+        self.folder.clone()
     }
 
     pub fn locate_nextflow_log(&self, tmp_dir: &PathBuf) -> Result<String, Epi4youError> {
+        log::info!("locating nextflow logs ...");
 
+        let mut candidate_logs: Vec<String> = Vec::new();
+        let mut candidate_pbs: Vec<PathBuf> = Vec::new();
 
-            log::info!("locating nextflow logs ...");
-        
-        
-            let mut candidate_logs: Vec<String> = Vec::new();
-            let mut candidate_pbs: Vec<PathBuf> = Vec::new();
-        
-            let mut glob_fish_str: String = String::from(self.src_dir.clone().into_os_string().to_str().unwrap());
-            glob_fish_str.push_str(&std::path::MAIN_SEPARATOR.to_string());
-            glob_fish_str.push_str(".nextflow.log*");
-        
-        
-            for entry in glob(&glob_fish_str).expect("Failed to read glob pattern") {
-                if entry.is_ok() {
-                    let cand_logfile = entry.unwrap();
-                    //println!("scanning file {:?}", cand_logfile);
-        
-                    let log = get_matched_nexflow_log(&cand_logfile, &self.wf_analysis.run_name);
-                    if log.is_some() {
-                        candidate_logs.push(log.unwrap());
-                        candidate_pbs.push(cand_logfile);
-                    }
+        let mut glob_fish_str = self.src_dir.to_string_lossy().into_owned();
+        glob_fish_str.push(std::path::MAIN_SEPARATOR);
+        glob_fish_str.push_str(".nextflow.log*");
+
+        for entry in glob(&glob_fish_str).map_err(|_| Epi4youError::FailedToParseFileContent)? {
+            if let Ok(cand_logfile) = entry {
+                let log = get_matched_nexflow_log(&cand_logfile, &self.wf_analysis.run_name);
+                if let Some(log) = log {
+                    candidate_logs.push(log);
+                    candidate_pbs.push(cand_logfile);
                 }
             }
-        
-            if candidate_logs.len() > 1 {
-                log::error!("log file selection is ambiguous - more than one match");
-                return Err(Epi4youError::FileSelectionIsAmbiguous);
-            } else if candidate_logs.len() == 1 {
-                // copy the logfile to the new working directory ...
+        }
+
+        match candidate_logs.len() {
+            0 => {
+                log::error!(
+                    "failed to locate appropriately tagged logfile - have you been housekeeping?"
+                );
+                Err(Epi4youError::FileSelectionFailedFileNotFound)
+            }
+            1 => {
                 let mut target = tmp_dir.clone();
                 target.push("nextflow.log");
-                let _ = fs::copy(candidate_pbs.get(0).unwrap(), &target);
+                fs::copy(&candidate_pbs[0], &target)
+                    .map_err(|_| Epi4youError::FailedToWritePath(target.clone()))?;
                 log::info!("populating nextflow.log to [{:?}]", target);
-                return Ok(String::from(candidate_logs.get(0).unwrap()));
-            } else {
-                log::error!("failed to locate appropriately tagged logfile - have you been housekeeping?");
-                return Err(Epi4youError::FileSelectionFailedFileNotFound);
+                Ok(candidate_logs.remove(0))
             }
-
-        
-
+            _ => {
+                log::error!("log file selection is ambiguous - more than one match");
+                Err(Epi4youError::FileSelectionIsAmbiguous)
+            }
+        }
     }
 
+    pub fn extract_log_stdout(
+        &self,
+        nf_log: &str,
+        tmp_dir: &PathBuf,
+    ) -> Result<String, Epi4youError> {
+        let allowed = ["[main] INFO", "[main] WARN", "[Task submitter] INFO"];
+        let disallowed = ["DEBUG", "[Task monitor]", "org.pf4j"];
 
+        let mut cache = String::new();
+        let mut capture = false;
 
-pub fn extract_log_stdout(&self, nf_log: &str, tmp_dir: &PathBuf) -> Result<String, Epi4youError> {
-    /* the challenge here is that many entries are multi-line; we need to
-    select for the fields of interest and exclude fields that are irrelevant */
-
-    let allowed = vec![
-        String::from("[main] INFO"),
-        String::from("[main] WARN"),
-        String::from("[Task submitter] INFO"),
-    ];
-
-    let disallowed = vec![
-        String::from("DEBUG"),
-        // String::from("[Task submitter]"),
-        String::from("[Task monitor]"),
-        String::from("org.pf4j"),
-    ];
-
-    let mut cache = String::new();
-    let mut capture: bool = false;
-
-    let lines = nf_log.split("\n");
-
-    for mut line in lines {
-        for allowed_key in &allowed {
-            if line.contains(allowed_key) {
+        for mut line in nf_log.lines() {
+            if allowed.iter().any(|allowed_key| line.contains(allowed_key)) {
                 capture = true;
             }
-        }
-        for disallowed_key in &disallowed {
-            if line.contains(disallowed_key) {
+
+            if disallowed
+                .iter()
+                .any(|disallowed_key| line.contains(disallowed_key))
+            {
                 capture = false;
             }
+
+            if capture {
+                if allowed.iter().any(|allowed_key| line.contains(allowed_key)) {
+                    if let Some((_, payload)) = line.split_once(" - ") {
+                        line = payload;
+                    }
+                }
+
+                cache.push_str(line);
+                cache.push('\n');
+            }
         }
-        if capture {
-            for allowed_key in &allowed {
-                if line.contains(allowed_key) {
-                    let mut idx = line.find(" - ").unwrap();
-                    idx += 3;
-                    line = &line[idx..];
+
+        let mut target = tmp_dir.clone();
+        target.push("nextflow.stdout");
+        fs::write(&target, &cache).map_err(|_| Epi4youError::FailedToWritePath(target.clone()))?;
+        println!("populating nextflow.stdout to [{:?}]", target);
+        Ok(cache)
+    }
+
+    pub fn prepare_progress_json(
+        &self,
+        nextflow_stdout: &str,
+        temp_dir: &PathBuf,
+        ulid_str: &str,
+    ) -> Result<PathBuf, Epi4youError> {
+        let mut progress = ProgressJson {
+            name: ulid_str.to_owned(),
+            key: HashMap::new(),
+        };
+
+        let mut process_counter: HashMap<String, u16> = HashMap::new();
+        let mut bfx_process: Vec<String> = Vec::new();
+
+        let subproc = "Submitted process >";
+        for mut line in nextflow_stdout.lines() {
+            if line.starts_with('[') && line.contains(subproc) {
+                let idx = line.find(subproc).unwrap() + subproc.len();
+                line = line[idx..].trim();
+
+                if let Some((trimmed, _)) = line.split_once(" (") {
+                    line = trimmed.trim();
+                }
+
+                if let Some(count) = process_counter.get_mut(line) {
+                    *count += 1;
+                } else {
+                    process_counter.insert(line.to_owned(), 1);
+                    bfx_process.push(line.to_owned());
                 }
             }
-
-            cache.push_str(line);
-            cache.push('\n');
         }
-    }
-    
-    //println!("{cache}");
-    let mut target = tmp_dir.clone();
-    target.push("nextflow.stdout");
-    let status = fs::write(&target, &cache);
-    if status.is_ok() {
-        println!("populating nextflow.stdout to [{:?}]", target);
-        return Ok(cache);
-    }
 
-    return Err(Epi4youError::FailedToParseFileContent);
-}
-
-
-
-pub fn prepare_progress_json(&self, nextflow_stdout: &String, temp_dir: &PathBuf, ulid_str: &String) -> Result<PathBuf, Epi4youError> {
-
-    /*
-    {"01HFV9GNS1PPPRCBB8JWBB4W64":
-    {"pipeline:variantCallingPipeline:sanitizeRefFile":{"status":"COMPLETED","tag":null,"total":1,"complete":1},
-    "fastcat":{"status":"COMPLETED","tag":null,"total":2,"complete":2},
-    "pipeline:getVersions":{"status":"COMPLETED","tag":null,"total":1,"complete":1},
-    "pipeline:getParams":{"status":"COMPLETED","tag":null,"total":1,"complete":1},
-    "pipeline:variantCallingPipeline:lookupMedakaModel":{"status":"COMPLETED","tag":null,"total":1,"complete":1},
-    "pipeline:subsetReads":{"status":"COMPLETED","tag":null,"total":2,"complete":2},
-    "pipeline:porechop":{"status":"COMPLETED","tag":null,"total":2,"complete":2},
-    "pipeline:addMedakaToVersionsFile":{"status":"COMPLETED","tag":null,"total":1,"complete":1},
-    "pipeline:variantCallingPipeline:alignReads":{"status":"COMPLETED","tag":null,"total":2,"complete":2},
-    "pipeline:variantCallingPipeline:bamstats":{"status":"COMPLETED","tag":null,"total":2,"complete":2},
-    "pipeline:variantCallingPipeline:mosdepth":{"status":"COMPLETED","tag":null,"total":10,"complete":10},
-    "pipeline:variantCallingPipeline:downsampleBAMforMedaka":{"status":"COMPLETED","tag":null,"total":2,"complete":2},
-    "pipeline:variantCallingPipeline:concatMosdepthResultFiles":{"status":"COMPLETED","tag":null,"total":2,"complete":2},
-    "pipeline:variantCallingPipeline:medakaConsensus":{"status":"COMPLETED","tag":null,"total":10,"complete":10},
-    "pipeline:variantCallingPipeline:medakaVariant":{"status":"COMPLETED","tag":null,"total":2,"complete":2},
-    "pipeline:collectFilesInDir":{"status":"COMPLETED","tag":null,"total":2,"complete":2},
-    "pipeline:makeReport":{"status":"COMPLETED","tag":null,"total":1,"complete":1},
-    "output":{"status":"COMPLETED","tag":null,"total":14,"complete":14}
-    }
-    } 
-    */
-
-    let v:HashMap<String, ProgressItem> = HashMap::new();
-    let mut x = ProgressJson{name: ulid_str.to_owned(), key: v};
-
-    let mut process_counter: HashMap<String, u16> = HashMap::new();
-    let mut bfx_process: Vec<String> = Vec::new();
-
-    let subproc = "Submitted process >";
-    let lines = nextflow_stdout.split("\n");
-    for mut line in lines {
-        if line.starts_with("[") && line.contains(subproc) {
-            let idx = line.find(subproc).unwrap() + subproc.len();
-            line = &line[idx..].trim();
-
-            if line.contains(" (") {
-                line = &line[..line.find(" (").unwrap()].trim()
-            }
-
-            if process_counter.contains_key(line) {
-                process_counter.insert(line.to_owned(), process_counter.get(line).unwrap() + 1);
-            } else {
-                process_counter.insert(line.to_owned(), 1);
-                bfx_process.push(line.to_owned());
-            }
+        for key in bfx_process {
+            let val = process_counter.get(&key).unwrap();
+            let pi = ProgressItem {
+                status: String::from("COMPLETED"),
+                tag: String::from("null"),
+                total: *val,
+                complete: *val,
+            };
+            progress.key.insert(key, pi);
         }
-    }
 
-    for key in bfx_process {
-        let val = process_counter.get(&key).unwrap();
-        let pi = ProgressItem{status: String::from("COMPLETED"), tag: String::from("null"), total: *val, complete: *val};
-        x.key.insert(key, pi);
-    }
-
-    let s = serde_json::to_string(&x);
-
-    if s.is_err() {
-        eprintln!("{:?}", s.err());
-    } else {
+        let serialized =
+            serde_json::to_string(&progress).map_err(|_| Epi4youError::FailedToParseFileContent)?;
         let mut target = temp_dir.clone();
         target.push("progress.json");
-        let status = fs::write(&target, &s.unwrap());
-        if status.is_ok() {
-            println!("populating progress.json to [{:?}]", target);
-            return Ok(target);
+        fs::write(&target, serialized)
+            .map_err(|_| Epi4youError::FailedToWritePath(target.clone()))?;
+        println!("populating progress.json to [{:?}]", target);
+        Ok(target)
+    }
+}
+
+fn resolve_analysis_dir(command: &str, analysis_folder: &Path) -> Option<PathBuf> {
+    let output_dir = parse_output_dir(command)?;
+    let candidate = analysis_folder.join(output_dir);
+
+    if candidate.exists() && candidate.is_dir() {
+        Some(candidate)
+    } else {
+        None
+    }
+}
+
+fn fallback_output_dir(analysis_folder: &Path) -> Option<PathBuf> {
+    let candidate = analysis_folder.join("output");
+    if candidate.exists() && candidate.is_dir() {
+        Some(candidate)
+    } else {
+        None
+    }
+}
+
+fn parse_output_dir(command: &str) -> Option<&str> {
+    const KEYS: [&str; 4] = ["--out_dir=", "--out-dir=", "--out_dir", "--out-dir"];
+
+    for token in command.split_whitespace() {
+        if let Some(value) = token
+            .strip_prefix(KEYS[0])
+            .or_else(|| token.strip_prefix(KEYS[1]))
+        {
+            return (!value.is_empty()).then_some(value);
         }
     }
-    return Err(Epi4youError::FailedToParseFileContent);
-}
 
-
-
-
-}
-
-
-
-fn get_matched_nexflow_log(logfile: &PathBuf, runid: &String) -> Option<String> {
-    let contents = fs::read_to_string(logfile).unwrap();
-    if contents.contains(runid) {
-        //println!("{contents}");
-        println!("logfile match [{:?}]", logfile);
-        return Some(contents);
+    let mut tokens = command.split_whitespace();
+    while let Some(token) = tokens.next() {
+        if token == KEYS[2] || token == KEYS[3] {
+            return tokens
+                .next()
+                .map(|value| value.trim_matches('"').trim_matches('\''))
+                .filter(|value| !value.is_empty());
+        }
     }
-    return None;
+
+    None
+}
+
+fn get_matched_nexflow_log(cand_logfile: &PathBuf, run_name: &str) -> Option<String> {
+    let content = fs::read_to_string(cand_logfile).ok()?;
+    content.contains(run_name).then_some(content)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_output_dir, resolve_analysis_dir};
+    use std::{fs, path::PathBuf};
+
+    #[test]
+    fn parses_output_dir_argument_with_equals() {
+        assert_eq!(
+            parse_output_dir("nextflow run wf --out_dir=results"),
+            Some("results")
+        );
+        assert_eq!(
+            parse_output_dir("nextflow run wf --out-dir=results"),
+            Some("results")
+        );
+    }
+
+    #[test]
+    fn parses_output_dir_argument_with_separate_value() {
+        assert_eq!(
+            parse_output_dir("nextflow run wf --out_dir results -profile test"),
+            Some("results")
+        );
+        assert_eq!(
+            parse_output_dir("nextflow run wf --out-dir 'results' -profile test"),
+            Some("results")
+        );
+    }
+
+    #[test]
+    fn resolves_existing_analysis_dir() {
+        let root = unique_test_dir("analysis-dir");
+        let results = root.join("results");
+        fs::create_dir_all(&results).unwrap();
+
+        let resolved = resolve_analysis_dir("nextflow run wf --out_dir results", &root);
+        assert_eq!(resolved, Some(results));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    fn unique_test_dir(prefix: &str) -> PathBuf {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "epi4you-{prefix}-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        path
+    }
 }

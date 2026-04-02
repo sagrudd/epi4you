@@ -1,25 +1,22 @@
-use app_db::dbmanager;
-use clap::{Arg, ArgAction, Command, Parser, Subcommand};
+use clap::{Arg, Command};
 use create_2me::create_from_cli_run;
 use env_logger::Env;
-use epi2me_db::epi2me_manager;
 use epi4you_errors::Epi4youError;
 use importer::import_from_2me;
-use workflow::workflow_manager;
 
 mod app_db;
 mod bundle;
+mod dataframe;
 mod epi2me_db;
 mod epi2me_tar;
-mod dataframe;
 // mod importer;
 mod json;
 // mod manifest;
 mod depme_nextflow;
 mod provenance;
+mod settings;
 mod tempdir;
 mod workflow;
-mod settings;
 
 mod docker;
 mod xmanifest;
@@ -45,16 +42,14 @@ pub mod importer {
 }
 
 pub mod nextflow {
+    pub mod nextflow_analysis;
     pub mod nextflow_artefact;
+    pub mod nextflow_log_item;
     pub mod nextflow_progress;
     pub mod nextflow_toolkit;
-    pub mod nextflow_log_item;
-    pub mod nextflow_analysis;
 }
 
-
-
-/* 
+/*
 
 #[derive(Subcommand)]
 enum Datatypes {
@@ -191,23 +186,28 @@ enum Datatypes {
 }
 */
 
-
 #[tokio::main]
 async fn main() {
-
     let env = Env::default()
-    .filter_or("MY_LOG_LEVEL", "debug")
-    .write_style_or("MY_LOG_STYLE", "always");
+        .filter_or("MY_LOG_LEVEL", "debug")
+        .write_style_or("MY_LOG_STYLE", "always");
     env_logger::init_from_env(env);
 
-    let tempdir = tempdir::get_tempdir();
-    if tempdir.is_err() {
-        eprintln!("error creating tempdir - aborting!");
-        return;
-    }
-    let mut temp_dir = tempdir.ok().unwrap();
-    temp_dir.keep();
+    let mut temp_dir = match tempdir::get_tempdir() {
+        Ok(temp_dir) => temp_dir,
+        Err(err) => {
+            eprintln!("error creating tempdir: {err:?}");
+            std::process::exit(1);
+        }
+    };
 
+    if let Err(err) = run(&mut temp_dir).await {
+        eprintln!("{err:?}");
+        std::process::exit(1);
+    }
+}
+
+async fn run(temp_dir: &mut tempdir::TempDir) -> Result<(), Epi4youError> {
     let use_args: Vec<Arg> = Vec::<Arg>::new();
     let mut subcmds: Vec<Command> = Vec::<Command>::new();
 
@@ -215,35 +215,43 @@ async fn main() {
     subcmds.push(import_from_2me::get_cli_setup());
 
     let app = Command::new(epi4you::APPLICATION_NAME)
-    .subcommand_required(false)
-    .version(epi4you::APPLICATION_VERSION)
-    .author(epi4you::APPLICATION_AUTHOR)
-    .about(epi4you::APPLICATION_ABOUT)
-    .long_about(epi4you::APPLICATION_DESCRIPTION)
-    .args(use_args)
-    .subcommands(subcmds.clone());
+        .subcommand_required(false)
+        .version(epi4you::APPLICATION_VERSION)
+        .author(epi4you::APPLICATION_AUTHOR)
+        .about(epi4you::APPLICATION_ABOUT)
+        .long_about(epi4you::APPLICATION_DESCRIPTION)
+        .args(use_args)
+        .subcommands(subcmds.clone());
 
-    let xargs = app.try_get_matches();
-    if xargs.is_ok() {
-        let cmdkeys: Vec<&str> = subcmds.iter().map(|x| x.get_name()).collect();
-
-        let status;
-
-        if cmdkeys.contains(&create_from_cli_run::NEXTFLOW_RUN) && xargs.as_ref().ok().unwrap().subcommand_matches(create_from_cli_run::NEXTFLOW_RUN).is_some()  { 
-            log::debug!("subcommand [{}] has been called", create_from_cli_run::NEXTFLOW_RUN);
-            status = create_from_cli_run::process_clicapture_command(&xargs.ok().unwrap().subcommand_matches(create_from_cli_run::NEXTFLOW_RUN).unwrap(), &mut temp_dir);
-        } else if cmdkeys.contains(&import_from_2me::IMPORT2ME) && xargs.as_ref().ok().unwrap().subcommand_matches(import_from_2me::IMPORT2ME).is_some()  { 
-            log::debug!("subcommand [{}] has been called", import_from_2me::IMPORT2ME);
-            status = import_from_2me::process_2me_import_command(&xargs.ok().unwrap().subcommand_matches(import_from_2me::IMPORT2ME).unwrap(), &mut temp_dir).await;
-        } else {
-            status = malformed_cli();
+    match app.try_get_matches() {
+        Ok(matches) => match matches.subcommand() {
+            Some((create_from_cli_run::NEXTFLOW_RUN, sub_matches)) => {
+                log::debug!(
+                    "subcommand [{}] has been called",
+                    create_from_cli_run::NEXTFLOW_RUN
+                );
+                create_from_cli_run::process_clicapture_command(sub_matches, temp_dir)
+            }
+            Some((import_from_2me::IMPORT2ME, sub_matches)) => {
+                log::debug!(
+                    "subcommand [{}] has been called",
+                    import_from_2me::IMPORT2ME
+                );
+                import_from_2me::process_2me_import_command(sub_matches, temp_dir).await
+            }
+            Some((name, _)) => {
+                log::error!("unexpected subcommand [{name}]");
+                Err(Epi4youError::MalformedCLISetup)
+            }
+            None => Ok(()),
+        },
+        Err(err) => {
+            err.print().ok();
+            Ok(())
         }
-
-    } else {
-        println!("{:?}", xargs.as_ref().err().unwrap().print().ok().unwrap());
     }
 
-    /* 
+    /*
 
     match &cliargs.command {
 
@@ -295,10 +303,4 @@ async fn main() {
     }
 
     */
-
-}
-
-
-fn malformed_cli() -> Result<(), Epi4youError> {
-    return Err(Epi4youError::MalformedCLISetup);
 }

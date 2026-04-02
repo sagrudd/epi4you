@@ -1,86 +1,51 @@
 use std::collections::HashMap;
 
-use regex::Regex;
 use url::{Position, Url};
 
+const DEFAULT_VERSION: &str = "dev";
+const LAUNCH_PREFIX: &str = "Launching `";
+const REVISION_KEY: &str = " - revision: ";
+const VERSION_MARKER: &str = "||||||||||";
 
 pub struct NextFlowLogs {
     facet: HashMap<String, String>,
 }
 
 impl NextFlowLogs {
-
     pub fn init(log: &str) -> Self {
-
         let mut facet = HashMap::<String, String>::new();
 
-        let mut name = "";
-        let mut revision = "";
-        let revision_key = " - revision: ";
-        let url_str_key = r"Launching `";
-        let mut project = String::from("");
-        let mut pname = String::from("");
-        let mut version = String::from("dev");
-        let xxxkey = "||||||||||";
+        let mut name = String::new();
+        let mut revision = String::new();
+        let mut project = String::new();
+        let mut pname = String::new();
+        let mut version = String::from(DEFAULT_VERSION);
 
-        //let re = Regex::new(r#"^\|+"#).unwrap();
+        for line in log.lines() {
+            if let Some(parsed) = parse_launch_line(line) {
+                name = parsed.name;
+                revision = parsed.revision;
+                project = parsed.project;
+                pname = parsed.pname;
+                continue;
+            }
 
-        let lines = log.lines();
-        for (ptr, line) in lines.into_iter().enumerate() {
-            /*if ptr <= 30 {
-                println!("{line}");
-            }*/
-            if line.contains(url_str_key) {
-                log::error!("{line}");
-
-                let clipped_line = &line[line.find(url_str_key).unwrap()+url_str_key.len()..];
-
-                name = &clipped_line[clipped_line.find("[").unwrap()+1..clipped_line.find("]").unwrap()];
-                revision = &clipped_line[clipped_line.find(revision_key).unwrap()+revision_key.len()..];
-                revision = &revision[..revision.find(" ").unwrap()];
-                let mut url_str = &line[line.find(url_str_key).unwrap()+url_str_key.len()..];
-                url_str = &url_str[..url_str.find("`").unwrap()];
-    
-                let url = Url::parse(url_str);
-                if url.is_ok() {
-                    let data_url_payload = &url.unwrap()[Position::AfterHost..][1..];
-                    log::debug!("{:?}", &data_url_payload);
-    
-                    let x = &data_url_payload.split_once('/');
-                    if x.is_some() {
-                        let (aproject, apname) = x.clone().unwrap();
-                        project = String::from(aproject);
-                        pname = String::from(apname);
-                    }
-                }
-            //} else if line.contains(":") && line.starts_with(" ") {
-            //    let a: Vec::<&str> = line.split(":").collect();
-            //    facet.insert(a[0].trim().into(), a[1].trim().into());
-            } else if line.contains(xxxkey) && line.contains(&pname) {
-                log::error!("extracting vers from [{}]", line);
-                let v = line[line.find(&pname).unwrap()+pname.len()..].trim();
-                if v.contains("-") {
-                    let vstr = &v[.. v.find("-").unwrap()];
-                    version = String::from(vstr);
-                }
+            if !pname.is_empty() && line.contains(VERSION_MARKER) && line.contains(&pname) {
+                version = parse_version(line, &pname);
             }
         }
 
-        facet.insert("name".into(), name.into());
-        facet.insert("revision".into(), revision.into());
-        facet.insert("project".into(), project.into());
-        facet.insert("pname".into(), pname.into());
-        facet.insert("version".into(), version.into());
-        
+        facet.insert("name".into(), name);
+        facet.insert("revision".into(), revision);
+        facet.insert("project".into(), project);
+        facet.insert("pname".into(), pname);
+        facet.insert("version".into(), version);
 
-        return NextFlowLogs {
-            facet,
-        };
-
+        NextFlowLogs { facet }
     }
 
     pub fn get_value(&self, key: &str) -> String {
-        return String::from(self.facet.get(key).unwrap());
+        self.facet.get(key).cloned().unwrap_or_default()
     }
 
     pub fn test(&self) {
@@ -88,20 +53,111 @@ impl NextFlowLogs {
             log::debug!("{k}\t\t{v}");
         }
     }
-
 }
 
-/*
+#[derive(Debug, PartialEq, Eq)]
+struct LaunchLine {
+    name: String,
+    revision: String,
+    project: String,
+    pname: String,
+}
 
+fn parse_launch_line(line: &str) -> Option<LaunchLine> {
+    let clipped_line = line.split_once(LAUNCH_PREFIX)?.1;
+    let url_str = clipped_line.split('`').next()?;
+    let name = clipped_line
+        .split_once('[')?
+        .1
+        .split(']')
+        .next()?
+        .to_string();
 
-        
-            let lines = nextflow_stdout.split("\n");
-            for line in lines {
-                // println!("!{line}");
-                
-                
-                
-                
-            }
+    let revision = clipped_line
+        .split_once(REVISION_KEY)?
+        .1
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_string();
 
-*/
+    let (project, pname) = parse_project_and_name(url_str);
+
+    Some(LaunchLine {
+        name,
+        revision,
+        project,
+        pname,
+    })
+}
+
+fn parse_project_and_name(url_str: &str) -> (String, String) {
+    if let Ok(url) = Url::parse(url_str) {
+        let data_url_payload = &url[Position::AfterHost..].trim_start_matches('/');
+        if let Some((project, pname)) = data_url_payload.split_once('/') {
+            return (project.to_string(), pname.to_string());
+        }
+    }
+
+    let fallback_name = url_str.split('/').next().unwrap_or_default().to_string();
+    ("epi2me-labs".to_string(), fallback_name)
+}
+
+fn parse_version(line: &str, pname: &str) -> String {
+    line.split_once(pname)
+        .map(|(_, suffix)| suffix.trim())
+        .and_then(|suffix| suffix.split('-').next())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(DEFAULT_VERSION)
+        .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_launch_line, parse_version, NextFlowLogs};
+
+    #[test]
+    fn parses_launch_line_with_url() {
+        let line = "Apr-02 12:00:00.000 [main] INFO  nextflow.cli.CmdRun - Launching `https://github.com/epi2me-labs/wf-human-variation` [kind_curie] - revision: 123abc [v1.2.3]";
+        let parsed = parse_launch_line(line).unwrap();
+
+        assert_eq!(parsed.name, "kind_curie");
+        assert_eq!(parsed.revision, "123abc");
+        assert_eq!(parsed.project, "epi2me-labs");
+        assert_eq!(parsed.pname, "wf-human-variation");
+    }
+
+    #[test]
+    fn parses_launch_line_with_tuple_style_reference() {
+        let line = "Apr-02 12:00:00.000 [main] INFO  nextflow.cli.CmdRun - Launching `wf-basecalling` [brave_hopper] - revision: dev";
+        let parsed = parse_launch_line(line).unwrap();
+
+        assert_eq!(parsed.name, "brave_hopper");
+        assert_eq!(parsed.revision, "dev");
+        assert_eq!(parsed.project, "epi2me-labs");
+        assert_eq!(parsed.pname, "wf-basecalling");
+    }
+
+    #[test]
+    fn parses_version_without_dash_suffix() {
+        let version = parse_version("|||||||||| wf-basecalling 1.0.0", "wf-basecalling");
+        assert_eq!(version, "1.0.0");
+    }
+
+    #[test]
+    fn aggregates_log_metadata() {
+        let log = "\
+Apr-02 12:00:00.000 [main] INFO  nextflow.cli.CmdRun - Launching `https://github.com/epi2me-labs/wf-human-variation` [kind_curie] - revision: 123abc [v1.2.3]
+|||||||||| wf-human-variation 1.2.3-extra
+";
+
+        let parsed = NextFlowLogs::init(log);
+
+        assert_eq!(parsed.get_value("name"), "kind_curie");
+        assert_eq!(parsed.get_value("revision"), "123abc");
+        assert_eq!(parsed.get_value("project"), "epi2me-labs");
+        assert_eq!(parsed.get_value("pname"), "wf-human-variation");
+        assert_eq!(parsed.get_value("version"), "1.2.3");
+    }
+}

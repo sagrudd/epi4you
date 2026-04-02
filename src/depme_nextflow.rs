@@ -1,16 +1,15 @@
-use std::collections::HashMap;
-use std::{env, fs};
-use std::process::Command;
 use polars_core::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::process::Command;
+use std::{env, fs};
 
-use ulid::Ulid;
-use walkdir::WalkDir;
-use std::io::Cursor;
-use std::path::PathBuf;
 use glob::glob;
 use serde::ser::SerializeMap;
-
+use std::io::Cursor;
+use std::path::PathBuf;
+use ulid::Ulid;
+use walkdir::WalkDir;
 
 use crate::bundle::export_nf_workflow;
 use crate::dataframe::{nf_wf_vec_to_df, workflow_vec_to_df};
@@ -18,35 +17,22 @@ use crate::settings::list_available_workflows;
 use crate::tempdir::TempDir;
 use crate::workflow::Workflow;
 use crate::{bundle, tempdir};
-use crate::{dataframe::{nextflow_vec_to_df, print_polars_df}, bundle::anyvalue_to_str};
+use crate::{
+    bundle::anyvalue_to_str,
+    dataframe::{nextflow_vec_to_df, print_polars_df},
+};
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-pub fn nextflow_run_manager(list: &bool, nxf_bin: &Option<String>, nxf_work: &Option<String>, runid: &Option<String>, twome: &Option<String>, force: &bool) {
-
+pub fn nextflow_run_manager(
+    list: &bool,
+    nxf_bin: &Option<String>,
+    nxf_work: &Option<String>,
+    runid: &Option<String>,
+    twome: &Option<String>,
+    force: &bool,
+) {
 }
 
-
 fn extract_nextflow_workflow_config(workflow_id: &str) -> (String, HashMap<String, String>) {
-
     let output = Command::new("nextflow")
         .arg("config")
         .arg(workflow_id)
@@ -64,7 +50,6 @@ fn extract_nextflow_workflow_config(workflow_id: &str) -> (String, HashMap<Strin
     return (version, config);
 }
 
-
 fn parse_nextflow_workflow_info(workflow_id: &str) -> String {
     let lp = "local path  :";
     let output = Command::new("nextflow")
@@ -72,7 +57,7 @@ fn parse_nextflow_workflow_info(workflow_id: &str) -> String {
         .arg(workflow_id)
         .output()
         .expect("failed to execute process");
-    
+
     let wf_info = String::from_utf8_lossy(&output.stdout).into_owned();
     let mut wf_path = String::from("undefined");
     //println!("{}", wf_info);
@@ -86,8 +71,7 @@ fn parse_nextflow_workflow_info(workflow_id: &str) -> String {
     return wf_path;
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NextflowAssetWorkflow {
     pub workflow: String,
     pub path: String,
@@ -96,7 +80,6 @@ pub struct NextflowAssetWorkflow {
 }
 
 fn nextflow_workflow_pull(nxf_bin: &String, workflow: &String) -> Option<NextflowAssetWorkflow> {
-
     let output = Command::new(nxf_bin)
         .arg("pull")
         .arg(workflow)
@@ -110,11 +93,11 @@ fn nextflow_workflow_pull(nxf_bin: &String, workflow: &String) -> Option<Nextflo
         eprintln!("FUBAR - error with nextflow pull\n{}", trimmed_s);
         return None;
     }
-    
+
     let wf_path = parse_nextflow_workflow_info(workflow);
     let (wf_version, config) = extract_nextflow_workflow_config(workflow);
 
-    let wf = NextflowAssetWorkflow{
+    let wf = NextflowAssetWorkflow {
         workflow: String::from(workflow),
         path: String::from(wf_path),
         version: String::from(wf_version),
@@ -123,7 +106,6 @@ fn nextflow_workflow_pull(nxf_bin: &String, workflow: &String) -> Option<Nextflo
 
     return Some(wf);
 }
-
 
 fn get_local_artifacts(nxf_bin: &String) -> Vec<NextflowAssetWorkflow> {
     let mut artifacts: Vec<NextflowAssetWorkflow> = Vec::new();
@@ -144,7 +126,7 @@ fn get_local_artifacts(nxf_bin: &String) -> Vec<NextflowAssetWorkflow> {
         let wf_path = parse_nextflow_workflow_info(line);
         let (wf_version, config) = extract_nextflow_workflow_config(line);
 
-        let wf = NextflowAssetWorkflow{
+        let wf = NextflowAssetWorkflow {
             workflow: String::from(line),
             path: String::from(wf_path),
             version: String::from(wf_version),
@@ -155,15 +137,16 @@ fn get_local_artifacts(nxf_bin: &String) -> Vec<NextflowAssetWorkflow> {
     return artifacts;
 }
 
-
 fn list_installed_nextflow_artifacts(nxf_bin: &String) -> Option<DataFrame> {
     let artifacts = get_local_artifacts(nxf_bin);
     let df = nf_wf_vec_to_df(artifacts);
     return Some(df);
 }
 
-
-fn get_workflow_entity(key: &String, extant_artifacts: &Vec<NextflowAssetWorkflow>) -> Option<NextflowAssetWorkflow> {
+fn get_workflow_entity(
+    key: &String,
+    extant_artifacts: &Vec<NextflowAssetWorkflow>,
+) -> Option<NextflowAssetWorkflow> {
     for artif in extant_artifacts {
         if artif.workflow == key.to_owned() {
             return Some(artif.to_owned());
@@ -172,10 +155,13 @@ fn get_workflow_entity(key: &String, extant_artifacts: &Vec<NextflowAssetWorkflo
     return None;
 }
 
-
-
-
-pub fn nextflow_artifact_manager(list: &bool, workflow: &Vec<String>, nxf_bin: &Option<String>, pull: &bool, twome: &Option<String>, force: &bool, _docker: &bool) {
-    
-
+pub fn nextflow_artifact_manager(
+    list: &bool,
+    workflow: &Vec<String>,
+    nxf_bin: &Option<String>,
+    pull: &bool,
+    twome: &Option<String>,
+    force: &bool,
+    _docker: &bool,
+) {
 }

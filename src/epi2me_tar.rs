@@ -1,13 +1,15 @@
-use std::{fs::File, path::PathBuf, env};
+use std::{env, fs::File, path::PathBuf};
 
-use tar::{Builder};
+use tar::Builder;
 
 use crate::{epi2me_db, xmanifest::FileManifest};
 
-
-
-pub fn tar(wf_path: Option<&PathBuf>, tarfile: PathBuf, files: &Vec<FileManifest>, manifest: &PathBuf) {
-
+pub fn tar(
+    wf_path: Option<&PathBuf>,
+    tarfile: PathBuf,
+    files: &Vec<FileManifest>,
+    manifest: &PathBuf,
+) {
     let tarfile = File::create(tarfile).unwrap();
     let mut a = Builder::new(tarfile);
 
@@ -21,11 +23,13 @@ pub fn tar(wf_path: Option<&PathBuf>, tarfile: PathBuf, files: &Vec<FileManifest
     let _ = env::set_current_dir(&local_prefix);
 
     for file in files {
-
         let mut file_to_tar = PathBuf::from(file.relative_path.clone());
         file_to_tar.push(&file.filename);
 
-        println!("adding file [{}] to tarball", file_to_tar.as_os_str().to_str().unwrap());
+        println!(
+            "adding file [{}] to tarball",
+            file_to_tar.as_os_str().to_str().unwrap()
+        );
 
         let _ = a.append_path(file_to_tar);
     }
@@ -33,12 +37,9 @@ pub fn tar(wf_path: Option<&PathBuf>, tarfile: PathBuf, files: &Vec<FileManifest
     println!("writing manifest {:?}", manifest);
     //let _ = env::set_current_dir(&manifest.parent().unwrap());
     let _ = a.append_path(manifest);
-
-
-    
 }
 
-/* 
+/*
 pub fn untar(tarfile: &PathBuf) -> Option<PathBuf> {
     let local_prefix = epi2me_db::find_db().unwrap().epi4you_path;
     println!("untar of file [{:?}] into [{:?}]", tarfile, local_prefix);

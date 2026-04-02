@@ -1,11 +1,8 @@
-use uuid::Uuid;
 use chrono::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-
-#[derive(Serialize, Deserialize)]
-#[derive(Clone)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Epi2MeProvenance {
     pub id: String,
     pub action: String,
@@ -14,10 +11,8 @@ pub struct Epi2MeProvenance {
     pub timestamp: String,
 }
 
-
 impl Epi2MeProvenance {
     pub fn init(what: String, value: Option<String>) -> Self {
-
         let lwhen = Local::now().to_string();
 
         Epi2MeProvenance {

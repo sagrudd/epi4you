@@ -1,23 +1,20 @@
-use std::{path::PathBuf, fs};
+use crate::{
+    bundle::export_nf_workflow,
+    dataframe::{print_polars_df, two_field_filter, workflow_vec_to_df},
+    epi2me_db::{self, Epi2meSetup},
+    epi2me_workflow::Epi2meWorkflow,
+};
 use glob::glob;
 use polars_core::prelude::DataFrame;
-use serde::{Serialize, Deserialize};
-use crate::{bundle::export_nf_workflow, dataframe::{print_polars_df, two_field_filter, workflow_vec_to_df}, epi2me_db::{self, Epi2meSetup}, epi2me_workflow::Epi2meWorkflow};
+use serde::{Deserialize, Serialize};
+use std::{fs, path::PathBuf};
 
-
-#[derive(Serialize, Deserialize, Clone)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Workflow {
     pub project: String,
     pub name: String,
     pub version: String,
 }
-
-
-
-
-
-
 
 fn is_folder_wf_compliant(wffolder: &PathBuf) -> bool {
     let required_files = vec!["main.nf", "nextflow.config"];
@@ -37,30 +34,31 @@ fn is_folder_wf_compliant(wffolder: &PathBuf) -> bool {
     return false;
 }
 
-
-pub fn glob_path_by_wfname(epi2me: &Epi2meSetup, project: &String, name: &String) -> Option<PathBuf> {
-
+pub fn glob_path_by_wfname(
+    epi2me: &Epi2meSetup,
+    project: &String,
+    name: &String,
+) -> Option<PathBuf> {
     let mut src = PathBuf::from(&epi2me.epi2wf_dir);
     src.push(&project);
 
     let globpat = src.into_os_string().into_string().unwrap();
     let result = [&globpat, "/*", &name].join("");
-    
-    let gdata =  glob(&result).expect("Failed to read glob pattern");
+
+    let gdata = glob(&result).expect("Failed to read glob pattern");
     for entry in gdata {
         if entry.is_ok() {
             let entry_item = entry.unwrap();
             // ensure that the folder found is actually a nextflow folder (nanopore flavoured)
             if is_folder_wf_compliant(&entry_item) {
                 // println!("folder picked == {:?}", entry_item);
-                return Some(entry_item)
+                return Some(entry_item);
             }
         }
     }
     // we can also assess whether project is a link to e.g. a nextflow based folder elsewhere on CLI
     return None;
 }
-
 
 pub fn list_installed_workflows(path: &PathBuf) -> Vec<Workflow> {
     println!("\tparsing workflows from path [{:?}]", path);
@@ -72,7 +70,6 @@ pub fn list_installed_workflows(path: &PathBuf) -> Vec<Workflow> {
     for entry in glob(&path_pattern).expect("Failed to read glob pattern") {
         match entry {
             Ok(mut globpath) => {
-                
                 let mut config_path = globpath.clone();
                 config_path.push("nextflow.config");
                 let globpathstr = globpath.as_os_str().to_str().unwrap();
@@ -92,40 +89,34 @@ pub fn list_installed_workflows(path: &PathBuf) -> Vec<Workflow> {
                             version = String::from(man_version.unwrap());
                         }
 
-                        let w = Workflow{
+                        let w = Workflow {
                             project: project,
                             name: workflow,
                             version: String::from(version),
                         };
                         wfs.push(w);
-
                     }
                 }
-            },
+            }
             Err(e) => println!("{:?}", e),
         }
     }
     return wfs;
-
 }
-
 
 fn workflows_to_polars(path: &PathBuf) -> Option<DataFrame> {
     let wfs = list_installed_workflows(path);
     let df = workflow_vec_to_df(wfs);
     return Some(df);
 
-    /* 
+    /*
     let myd: DataFrame = struct_to_dataframe!(wfs, [project,
         name,
         version]).unwrap();
     */
-
 }
 
-
 pub fn insert_untarred_workflow(epi2me_workflow: &Epi2meWorkflow, force: &bool) {
-
     let e4u_path = epi2me_db::find_db().unwrap().epi4you_path;
 
     let mut dest_dir = epi2me_db::find_db().unwrap().epi2wf_dir;
@@ -138,17 +129,25 @@ pub fn insert_untarred_workflow(epi2me_workflow: &Epi2meWorkflow, force: &bool) 
             if *force {
                 // nuke the already existing directory - this is with vengeance
             } else {
-                eprintln!("The workflow directory [{:?}] already exists - consider `--force`", dest_dir);
+                eprintln!(
+                    "The workflow directory [{:?}] already exists - consider `--force`",
+                    dest_dir
+                );
                 return;
             }
         } else if dest_dir.is_file() {
-            eprintln!("The workflow directory [{:?}] already exists as a file - nonsense", dest_dir);
+            eprintln!(
+                "The workflow directory [{:?}] already exists as a file - nonsense",
+                dest_dir
+            );
             return;
         }
     }
 
     for file in &epi2me_workflow.files {
-        let file_to_check = PathBuf::from(&e4u_path).join(&file.relative_path).join(PathBuf::from(&file.filename));
+        let file_to_check = PathBuf::from(&e4u_path)
+            .join(&file.relative_path)
+            .join(PathBuf::from(&file.filename));
 
         let target = PathBuf::from(&file.relative_path);
         let mut t2: PathBuf = target.iter().skip(3).collect();
@@ -163,26 +162,28 @@ pub fn insert_untarred_workflow(epi2me_workflow: &Epi2meWorkflow, force: &bool) 
         println!("copying file [{:?}]", file_to_check);
         let _ = fs::copy(file_to_check, t3);
     }
-
 }
 
-
 pub fn workflow_manager(list: &bool, workflow: &Vec<String>, twome: &Option<String>, force: &bool) {
-    
     let src_dir = epi2me_db::find_db().unwrap().epi2wf_dir;
     let df = workflows_to_polars(&src_dir);
     let df2 = df.as_ref().unwrap();
     let mut picked = DataFrame::default();
 
     if *list {
-        println!("Listing installed bioinformatics workflows from [{:?}]", &src_dir);
+        println!(
+            "Listing installed bioinformatics workflows from [{:?}]",
+            &src_dir
+        );
         if df.as_ref().is_some() {
             print_polars_df(&df.unwrap());
         }
         return;
     }
     if workflow.len() == 0 {
-        eprintln!("The workflow option requires a `--workflow` parameter to specify workflow of interest");
+        eprintln!(
+            "The workflow option requires a `--workflow` parameter to specify workflow of interest"
+        );
         return;
     }
 
@@ -193,16 +194,25 @@ pub fn workflow_manager(list: &bool, workflow: &Vec<String>, twome: &Option<Stri
 
     for workflow_id in workflow {
         println!("processing workflow [{}]", &workflow_id);
-        
+
         // checking if project / name exist in the df
         let split = &workflow_id.split_once("/");
         if split.is_none() {
-            eprintln!("workflow [{:?}] could not be split - requires a '/' delimiter", &workflow_id);
+            eprintln!(
+                "workflow [{:?}] could not be split - requires a '/' delimiter",
+                &workflow_id
+            );
             return;
         }
         let (project, name) = split.unwrap();
         // filter on project and name
-        let filtered_df = two_field_filter(&df2, &String::from("project"), &String::from(project), &String::from("name"), &String::from(name)); 
+        let filtered_df = two_field_filter(
+            &df2,
+            &String::from("project"),
+            &String::from(project),
+            &String::from("name"),
+            &String::from(name),
+        );
         if filtered_df.is_none() {
             eprintln!("unexpected failure - failed to find appropriate workflow installation");
             return;
@@ -210,10 +220,17 @@ pub fn workflow_manager(list: &bool, workflow: &Vec<String>, twome: &Option<Stri
         let filtered = filtered_df.unwrap();
         let height = filtered.height();
         if height == 0 {
-            eprintln!("failed to resolve specified workflow installation [{}]", &workflow_id);
+            eprintln!(
+                "failed to resolve specified workflow installation [{}]",
+                &workflow_id
+            );
             return;
-        } else if height > 1 { // can this even happen?
-            eprintln!("specified workflow installation is ambiguous [{}]", &workflow_id);
+        } else if height > 1 {
+            // can this even happen?
+            eprintln!(
+                "specified workflow installation is ambiguous [{}]",
+                &workflow_id
+            );
             return;
         }
         // print_polars_df(&filtered);
@@ -230,5 +247,4 @@ pub fn workflow_manager(list: &bool, workflow: &Vec<String>, twome: &Option<Stri
 
     // and now export into an archive ...
     export_nf_workflow(None, &picked, twome, force);
-
 }

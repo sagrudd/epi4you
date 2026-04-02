@@ -1,18 +1,17 @@
-use chrono::{Local, DateTime};
-use fs_extra::{copy_items, dir};
-use rusqlite::{Connection, Result};
-use polars::prelude::*;
-use polars::df;
-use ulid::Ulid;
-use std::{env, fs};
-use std::path::PathBuf;
 use crate::dataframe::analysis_vec_to_df;
 use crate::dataframe::filter_df_by_value;
 use crate::dataframe::get_zero_val;
+use crate::epi2me_db;
 use crate::epi2me_desktop_analysis::Epi2meDesktopAnalysis;
 use crate::epi2me_workflow::Epi2meWorkflow;
-use crate::epi2me_db;
-
+use chrono::{DateTime, Local};
+use fs_extra::{copy_items, dir};
+use polars::df;
+use polars::prelude::*;
+use rusqlite::{Connection, Result};
+use std::path::PathBuf;
+use std::{env, fs};
+use ulid::Ulid;
 
 #[allow(dead_code)]
 #[allow(non_snake_case)]
@@ -32,8 +31,6 @@ pub struct Epi2MeAnalysis {
 
 #[allow(non_snake_case)]
 pub fn load_db(path: &PathBuf) -> Result<DataFrame, rusqlite::Error> {
-
-
     let lookup = String::from("SELECT id, path, name, status, workflowRepo, workflowUser, workflowCommit, workflowVersion, createdAt, updatedAt FROM bs");
 
     let connection = Connection::open(path)?;
@@ -66,8 +63,6 @@ pub fn load_db(path: &PathBuf) -> Result<DataFrame, rusqlite::Error> {
     Ok(df)
 }
 
-
-
 pub fn get_db_id_entry(runid: &String, polardb: &DataFrame) -> Result<DataFrame, PolarsError> {
     // is runid in name field and unique
     let df = filter_df_by_value(polardb, &String::from("name"), runid);
@@ -80,17 +75,18 @@ pub fn get_qualified_analysis_path(runid: &String, polardb: &DataFrame) -> PathB
     return PathBuf::from(get_zero_val(&stacked, &String::from("path")));
 }
 
-
-
-pub fn validate_qualified_analysis_workflow(runid: &String, polardb: &DataFrame, epi2wf_dir: &PathBuf) -> Option<Epi2meWorkflow> {
-    
+pub fn validate_qualified_analysis_workflow(
+    runid: &String,
+    polardb: &DataFrame,
+    epi2wf_dir: &PathBuf,
+) -> Option<Epi2meWorkflow> {
     let stacked = get_db_id_entry(runid, polardb).unwrap();
     let wf_proj = get_zero_val(&stacked, &String::from("workflowUser"));
     let wf_repo = get_zero_val(&stacked, &String::from("workflowRepo"));
     let wf_vers = get_zero_val(&stacked, &String::from("workflowVersion"));
 
     let mut workflow: String = String::new();
-    
+
     workflow.push_str(&wf_proj);
     workflow.push_str(&std::path::MAIN_SEPARATOR.to_string());
     workflow.push_str(&wf_repo);
@@ -100,16 +96,13 @@ pub fn validate_qualified_analysis_workflow(runid: &String, polardb: &DataFrame,
     let dir = workflow.check_defined_wfdir_exists(epi2wf_dir);
 
     if dir.is_some() {
-
         return Some(workflow);
     }
 
     return None;
 }
 
-
 pub fn validate_db_entry(runid: &String, polardb: &DataFrame) -> bool {
-
     let stacked = get_db_id_entry(runid, polardb);
     //println!("{:?}",stacked);
 
@@ -130,7 +123,7 @@ pub fn validate_db_entry(runid: &String, polardb: &DataFrame) -> bool {
 fn get_instance_struct(runid: &String, polardb: &DataFrame) -> Option<Epi2MeAnalysis> {
     if validate_db_entry(runid, polardb) {
         let stacked = get_db_id_entry(runid, polardb).unwrap();
-        let x = Epi2MeAnalysis { 
+        let x = Epi2MeAnalysis {
             id: get_zero_val(&stacked, &String::from("id")),
             path: get_zero_val(&stacked, &String::from("path")),
             name: get_zero_val(&stacked, &String::from("name")),
@@ -147,13 +140,9 @@ fn get_instance_struct(runid: &String, polardb: &DataFrame) -> Option<Epi2MeAnal
     return None;
 }
 
-
-
-
-
 pub fn print_appdb(df: &DataFrame) {
     env::set_var("POLARS_FMT_TABLE_HIDE_DATAFRAME_SHAPE_INFORMATION", "1");
-    env::set_var("POLARS_FMT_TABLE_HIDE_COLUMN_DATA_TYPES","1");
+    env::set_var("POLARS_FMT_TABLE_HIDE_COLUMN_DATA_TYPES", "1");
     env::set_var("POLARS_FMT_MAX_ROWS", "20");
     let df2 = df!(
         "id" => df.column("id").unwrap(),
@@ -168,8 +157,13 @@ pub fn print_appdb(df: &DataFrame) {
     }
 }
 
-
-fn field_update(path: &PathBuf, epi2me_instances: &DataFrame, runid_str: &String, key: &str, val: &str) {
+fn field_update(
+    path: &PathBuf,
+    epi2me_instances: &DataFrame,
+    runid_str: &String,
+    key: &str,
+    val: &str,
+) {
     let stacked = get_db_id_entry(runid_str, epi2me_instances).unwrap();
     let z = get_zero_val(&stacked, &String::from("id"));
     println!("using database entry id [{}]", z);
@@ -187,14 +181,13 @@ fn field_update(path: &PathBuf, epi2me_instances: &DataFrame, runid_str: &String
         println!("fubar creating STMT");
         return;
     }
-    
+
     let qq = stmt.unwrap().execute(&[val, &z.as_str()]);
     if qq.is_err() {
         println!("fubar with the qq");
         println!("{:?}", qq.err());
     }
 }
-
 
 fn drop_epi2me_instance(path: &PathBuf, epi2me_instances: &DataFrame, runid_str: &String) {
     let stacked = get_db_id_entry(runid_str, epi2me_instances).unwrap();
@@ -218,7 +211,6 @@ fn drop_epi2me_instance(path: &PathBuf, epi2me_instances: &DataFrame, runid_str:
     if dd.is_err() {
         println!("issue with deleting files at [{}]", y.as_str());
     }
-    
 }
 
 fn insert_into_db(path: &PathBuf, epi2meitem: &Epi2MeAnalysis) {
@@ -231,27 +223,29 @@ fn insert_into_db(path: &PathBuf, epi2meitem: &Epi2MeAnalysis) {
     let conn = connection.unwrap();
 
     let insert = String::from("INSERT into bs (id, path, name, status, workflowRepo, workflowUser, workflowCommit, workflowVersion, createdAt, updatedAt) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)");
-    let result = conn.execute(insert.as_str(), &[&epi2meitem.id,
-                                                                                &epi2meitem.path,
-                                                                                &epi2meitem.name,
-                                                                                &epi2meitem.status,
-                                                                                &epi2meitem.workflowRepo,
-                                                                                &epi2meitem.workflowUser,
-                                                                                &epi2meitem.workflowCommit,
-                                                                                &epi2meitem.workflowVersion,
-                                                                                &epi2meitem.createdAt,
-                                                                                &epi2meitem.updatedAt
-    ]);
+    let result = conn.execute(
+        insert.as_str(),
+        &[
+            &epi2meitem.id,
+            &epi2meitem.path,
+            &epi2meitem.name,
+            &epi2meitem.status,
+            &epi2meitem.workflowRepo,
+            &epi2meitem.workflowUser,
+            &epi2meitem.workflowCommit,
+            &epi2meitem.workflowVersion,
+            &epi2meitem.createdAt,
+            &epi2meitem.updatedAt,
+        ],
+    );
 
     if result.is_err() {
         println!("failure --- \n{:?}", result.err());
     }
-
 }
 
-
 fn get_run_status(id: &String, epi2me_instances: &DataFrame) -> Option<String> {
-    let x = validate_db_entry(id, epi2me_instances );
+    let x = validate_db_entry(id, epi2me_instances);
     if !x {
         return None;
     }
@@ -260,7 +254,6 @@ fn get_run_status(id: &String, epi2me_instances: &DataFrame) -> Option<String> {
     return Some(val);
 }
 
-
 fn housekeeper(epi2me_instances: &DataFrame) {
     // extract all unique workflow ids
 
@@ -268,7 +261,7 @@ fn housekeeper(epi2me_instances: &DataFrame) {
     let chunked_array: Vec<Option<&str>> = s.utf8().unwrap().into_iter().collect();
     for id in chunked_array.iter() {
         let id2 = String::from(id.unwrap());
-        
+
         let runstatus = get_run_status(&id2, epi2me_instances);
 
         if runstatus.is_some() {
@@ -278,7 +271,10 @@ fn housekeeper(epi2me_instances: &DataFrame) {
             // check that the status fits within a sensible predefined vocabulary
             if status_terms.contains(&runstatus.as_ref().unwrap().as_str()) {
                 let instancepath = get_qualified_analysis_path(&id2, epi2me_instances);
-                println!("id [{}] has status [{:?}] --> {:?}", id2, runstatus_str, instancepath);
+                println!(
+                    "id [{}] has status [{:?}] --> {:?}",
+                    id2, runstatus_str, instancepath
+                );
 
                 let paths = fs::read_dir(instancepath).unwrap();
                 for path in paths {
@@ -297,9 +293,7 @@ fn housekeeper(epi2me_instances: &DataFrame) {
     }
 }
 
-
 fn resync_progress_json(source: &String, ulid: &String, newlid: &String) {
-
     let file2mod = vec!["progress.json", "params.json", "launch.json"];
     let paths = fs::read_dir(source).unwrap();
     for path in paths {
@@ -317,12 +311,20 @@ fn resync_progress_json(source: &String, ulid: &String, newlid: &String) {
                 println!("error with writing file - {:?}", status.err());
             }
         }
-
     }
 }
 
-
-pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runid: &Option<String>, status: &Option<String>, delete: &bool, rename: &Option<String>, housekeeping: &bool, clone: &Option<String>) {
+pub fn dbmanager(
+    path: &PathBuf,
+    epi2me_instances: &DataFrame,
+    list: &bool,
+    runid: &Option<String>,
+    status: &Option<String>,
+    delete: &bool,
+    rename: &Option<String>,
+    housekeeping: &bool,
+    clone: &Option<String>,
+) {
     println!("Database functionality called ...");
 
     if *list {
@@ -347,15 +349,29 @@ pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runi
             return;
         }
         // define collection of allowed terms
-        let status_terms = vec!["UNKNOWN", "COMPLETED", "ERROR", "STOPPED_BY_USER", "RUNNING"];
+        let status_terms = vec![
+            "UNKNOWN",
+            "COMPLETED",
+            "ERROR",
+            "STOPPED_BY_USER",
+            "RUNNING",
+        ];
         // check that the status fits within a sensible predefined vocabulary
         if !status_terms.contains(&status.as_ref().unwrap().as_str()) {
-            println!("status [{}] is not an allowed term - {:?}", &status.as_ref().unwrap().as_str(), status_terms);
+            println!(
+                "status [{}] is not an allowed term - {:?}",
+                &status.as_ref().unwrap().as_str(),
+                status_terms
+            );
             return;
         }
-        field_update(path, epi2me_instances, runid_str, "status", &status.as_ref().unwrap().as_str());
-
-        
+        field_update(
+            path,
+            epi2me_instances,
+            runid_str,
+            "status",
+            &status.as_ref().unwrap().as_str(),
+        );
     } else if runid.is_some() && rename.is_some() {
         println!("renaming instance ....");
         let runid_str = &runid.as_ref().unwrap().to_string();
@@ -363,7 +379,13 @@ pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runi
         if !validate_db_entry(&runid_str, epi2me_instances) {
             return;
         }
-        field_update(path, epi2me_instances, runid_str, "name", &rename.as_ref().unwrap().as_str());
+        field_update(
+            path,
+            epi2me_instances,
+            runid_str,
+            "name",
+            &rename.as_ref().unwrap().as_str(),
+        );
     } else if clone.is_some() && runid.is_some() {
         println!("cloning instance ....");
         let runid_str = &runid.as_ref().unwrap().to_string();
@@ -373,10 +395,7 @@ pub fn dbmanager(path: &PathBuf, epi2me_instances: &DataFrame, list: &bool, runi
         }
         clone_extant_database_entry(runid_str, epi2me_instances, clone, path);
     }
-
 }
-
-
 
 fn epi2me_item_rebrand(epi2meitem: &Epi2MeAnalysis, clone: &Option<String>) -> Epi2MeAnalysis {
     let mut epi2meitem_x: Epi2MeAnalysis = epi2meitem.clone();
@@ -400,18 +419,29 @@ fn epi2me_item_rebrand(epi2meitem: &Epi2MeAnalysis, clone: &Option<String>) -> E
     return epi2meitem_x;
 }
 
-fn clone_extant_database_entry(runid_str: &String, epi2me_instances: &DataFrame, clone: &Option<String>, path: &PathBuf) {
+fn clone_extant_database_entry(
+    runid_str: &String,
+    epi2me_instances: &DataFrame,
+    clone: &Option<String>,
+    path: &PathBuf,
+) {
     let epi2meitem = get_instance_struct(runid_str, epi2me_instances);
     if epi2meitem.is_some() {
         let e2eitem = epi2meitem.unwrap();
         let mut src_dir = epi2me_db::find_db().unwrap().instances_path;
-        src_dir.push(vec![String::from(&e2eitem.workflowRepo), String::from(&e2eitem.id)].join("_"));
+        src_dir.push(
+            vec![
+                String::from(&e2eitem.workflowRepo),
+                String::from(&e2eitem.id),
+            ]
+            .join("_"),
+        );
 
         let epi2meitem_x = epi2me_item_rebrand(&e2eitem, clone);
         println!("new epi2meobj = {:?}", &epi2meitem_x);
 
         insert_into_db(&path, &epi2meitem_x);
-        
+
         // and copy across the accompanying files ...
         println!("copying files from source path [{:?}]", src_dir);
         let mut from_paths: Vec<String> = Vec::new();
@@ -430,75 +460,82 @@ fn clone_extant_database_entry(runid_str: &String, epi2me_instances: &DataFrame,
         println!("state = {:?}", cp);
 
         resync_progress_json(&dest, runid_str, &epi2meitem_x.id.clone());
-        
     }
 }
 
-
-pub fn insert_untarred_desktop_analysis(desktop_analysis: &Epi2meDesktopAnalysis, temp_dir: &PathBuf) {
-
+pub fn insert_untarred_desktop_analysis(
+    desktop_analysis: &Epi2meDesktopAnalysis,
+    temp_dir: &PathBuf,
+) {
     log::warn!("insert_untarred_desktop_analysis");
 
     let e2eitem = desktop_analysis.as_epi2me_analysis();
 
-        // let src_dir = epi2me_db::find_db().unwrap().epi2path;
-        // src_dir.push("instances");
-        // src_dir.push(vec![String::from(&e2eitem.workflowRepo) ,String::from(&e2eitem.id)].join("_"));
+    // let src_dir = epi2me_db::find_db().unwrap().epi2path;
+    // src_dir.push("instances");
+    // src_dir.push(vec![String::from(&e2eitem.workflowRepo) ,String::from(&e2eitem.id)].join("_"));
 
-        let clone: Option<String> = None; // keep the name already used
-        let epi2meitem_x = epi2me_item_rebrand(&e2eitem, &clone);
-        log::info!("new epi2meobj = {:?}", &epi2meitem_x);
-        
-        insert_into_db(&epi2me_db::find_db().unwrap().epi2db_path, &epi2meitem_x);
+    let clone: Option<String> = None; // keep the name already used
+    let epi2meitem_x = epi2me_item_rebrand(&e2eitem, &clone);
+    log::info!("new epi2meobj = {:?}", &epi2meitem_x);
 
-        // and copy across the accompanying files ...
-        for file in &desktop_analysis.files {
-            let file_to_check = PathBuf::from(&temp_dir).join(&file.relative_path).join(PathBuf::from(&file.filename));
-            
-            let mut rp = PathBuf::from(&file.relative_path);
-            // log::error!("relative path == {:?}", rp);
-            // log::error!("temppath      == {:?}", temp_dir);
-            if rp.starts_with("instances") || rp.starts_with("import_export_4you") || rp.starts_with("tmp") {
-                if rp.starts_with("instances") {
-                    rp = PathBuf::from(rp.strip_prefix("instances").unwrap());
-                    let exp_dir = vec![String::from(&e2eitem.workflowRepo), String::from(&e2eitem.id)].join("_");
-                    if rp.starts_with(&exp_dir) {
-                        rp = PathBuf::from(rp.strip_prefix(exp_dir).unwrap());
-                    }
-                } else if rp.starts_with("import_export_4you") {
-                    rp = PathBuf::from(rp.strip_prefix("import_export_4you").unwrap());
-                    // there is a presumption here that the first path element is just a ulid string from packaging cli nextflow run
-                    // -- just clip it  
-                    let mut components = rp.components();
-                    let c = components.next().unwrap().as_os_str().to_str().unwrap();
-                    rp = PathBuf::from(rp.strip_prefix(c).unwrap());
-                    log::error!("modified path == {:?}", rp);
-                } else if rp.starts_with("tmp") {
-                    rp = PathBuf::from(rp.strip_prefix("tmp").unwrap());
-                    // there is a presumption here that the first path element is just a ulid string from packaging cli nextflow run
-                    // -- just clip it  
-                    let mut components = rp.components();
-                    let c = components.next().unwrap().as_os_str().to_str().unwrap();
-                    rp = PathBuf::from(rp.strip_prefix(c).unwrap());
+    insert_into_db(&epi2me_db::find_db().unwrap().epi2db_path, &epi2meitem_x);
+
+    // and copy across the accompanying files ...
+    for file in &desktop_analysis.files {
+        let file_to_check = PathBuf::from(&temp_dir)
+            .join(&file.relative_path)
+            .join(PathBuf::from(&file.filename));
+
+        let mut rp = PathBuf::from(&file.relative_path);
+        // log::error!("relative path == {:?}", rp);
+        // log::error!("temppath      == {:?}", temp_dir);
+        if rp.starts_with("instances")
+            || rp.starts_with("import_export_4you")
+            || rp.starts_with("tmp")
+        {
+            if rp.starts_with("instances") {
+                rp = PathBuf::from(rp.strip_prefix("instances").unwrap());
+                let exp_dir = vec![
+                    String::from(&e2eitem.workflowRepo),
+                    String::from(&e2eitem.id),
+                ]
+                .join("_");
+                if rp.starts_with(&exp_dir) {
+                    rp = PathBuf::from(rp.strip_prefix(exp_dir).unwrap());
                 }
-            } 
-
-            let dest_file = PathBuf::from(&epi2meitem_x.path).join(&rp).join(PathBuf::from(&file.filename));
-            // log::error!("destination [{:?}]", dest_file);
-
-            // ensure that directories have been created 
-            if dest_file.parent().is_some() && !dest_file.parent().unwrap().exists() {
-                let _ = fs::create_dir_all(dest_file.parent().unwrap());
+            } else if rp.starts_with("import_export_4you") {
+                rp = PathBuf::from(rp.strip_prefix("import_export_4you").unwrap());
+                // there is a presumption here that the first path element is just a ulid string from packaging cli nextflow run
+                // -- just clip it
+                let mut components = rp.components();
+                let c = components.next().unwrap().as_os_str().to_str().unwrap();
+                rp = PathBuf::from(rp.strip_prefix(c).unwrap());
+                log::error!("modified path == {:?}", rp);
+            } else if rp.starts_with("tmp") {
+                rp = PathBuf::from(rp.strip_prefix("tmp").unwrap());
+                // there is a presumption here that the first path element is just a ulid string from packaging cli nextflow run
+                // -- just clip it
+                let mut components = rp.components();
+                let c = components.next().unwrap().as_os_str().to_str().unwrap();
+                rp = PathBuf::from(rp.strip_prefix(c).unwrap());
             }
-            log::debug!("copying file [{:?}]", file_to_check);
-            let _ = fs::copy(file_to_check, dest_file);
-        
+        }
+
+        let dest_file = PathBuf::from(&epi2meitem_x.path)
+            .join(&rp)
+            .join(PathBuf::from(&file.filename));
+        // log::error!("destination [{:?}]", dest_file);
+
+        // ensure that directories have been created
+        if dest_file.parent().is_some() && !dest_file.parent().unwrap().exists() {
+            let _ = fs::create_dir_all(dest_file.parent().unwrap());
+        }
+        log::debug!("copying file [{:?}]", file_to_check);
+        let _ = fs::copy(file_to_check, dest_file);
 
         // and manually add the manifest file ....
-
-
 
         resync_progress_json(&epi2meitem_x.path, &e2eitem.id, &epi2meitem_x.id.clone());
     }
 }
-

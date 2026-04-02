@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 
-
 fn string_clip(src: String) -> String {
     let mut start = 0 as usize;
     let mut end = src.len();
 
     let first = src.chars().next().unwrap();
-    let last = src.chars().nth(end-1).unwrap();
+    let last = src.chars().nth(end - 1).unwrap();
 
     match first {
         '\'' => start += 1,
@@ -54,11 +53,16 @@ pub fn nextflow_parser(xcontents: &String) -> HashMap<String, String> {
             // let close_key = &key[key.len()-1];
             // println!("!! closing chunk -- [{}]", close_key);
             key.pop();
-        } else if String::from(l2).ends_with("[") && cache_key == String::from("") {  // collapse nested
+        } else if String::from(l2).ends_with("[") && cache_key == String::from("") {
+            // collapse nested
             let (field, _value) = s.split_at(s.find(" = ").unwrap());
             cache_key = String::from(field.trim());
             // println!("setting cache_key = [{}]", &cache_key);
-        } else if String::from(l2).starts_with("]") && String::from(l2).ends_with("]") && cache_key != String::from("") { // collapse nexted // TODO: this should be rethought
+        } else if String::from(l2).starts_with("]")
+            && String::from(l2).ends_with("]")
+            && cache_key != String::from("")
+        {
+            // collapse nexted // TODO: this should be rethought
             // println!("closing cache_key = [{}]", &cache_key);
             let merged = cache.join("-");
             let merged_key = vec![key.clone(), vec![cache_key]].concat().join(".");
@@ -73,13 +77,13 @@ pub fn nextflow_parser(xcontents: &String) -> HashMap<String, String> {
             let (field, value) = s.split_at(s.find(" = ").unwrap());
             let val = String::from(&value[2..]);
             let val2 = string_clip(String::from(val.trim()));
-            let merged_key = vec![key.clone(), vec![String::from(field.trim())]].concat().join(".");
+            let merged_key = vec![key.clone(), vec![String::from(field.trim())]]
+                .concat()
+                .join(".");
             nextflow_config.insert(merged_key, String::from(val2));
         } else {
             // println!("{}", l2);
         }
-        
     }
     return nextflow_config;
-
 }

@@ -1,4 +1,3 @@
-
 use std::path::PathBuf;
 
 use polars_core::prelude::*;
@@ -7,16 +6,15 @@ use std::fs::remove_dir_all;
 
 use crate::epi2me_db::{self};
 use crate::epi2me_desktop_analysis::Epi2meDesktopAnalysis;
-use crate::{epi2me_tar, xnf_parser};
 use crate::epi2me_workflow::{get_relative_path, Epi2meWorkflow};
 use crate::tempdir::{self, TempDir};
+use crate::{epi2me_tar, xnf_parser};
 
 use crate::xmanifest::{Epi2MeManifest, MANIFEST_JSON};
-use crate::{xmanifest::{Epi2MeContent, FileManifest}, app_db};
-
-
-
-
+use crate::{
+    app_db,
+    xmanifest::{Epi2MeContent, FileManifest},
+};
 
 pub fn anyvalue_to_str(value: Option<&AnyValue>) -> String {
     if value.is_some() {
@@ -32,13 +30,13 @@ pub fn anyvalue_to_str(value: Option<&AnyValue>) -> String {
     return String::from("Err!");
 }
 
-
-
-
-
-
-pub fn export_nf_workflow(wf_path: Option<&PathBuf>, source: &DataFrame, twome: &Option<String>, force: &bool) {
-    // core path 
+pub fn export_nf_workflow(
+    wf_path: Option<&PathBuf>,
+    source: &DataFrame,
+    twome: &Option<String>,
+    force: &bool,
+) {
+    // core path
     //let core_path = epi2me_db::find_db().unwrap().epi2wf_dir;
     let local_prefix: PathBuf;
     if wf_path.is_some() {
@@ -69,7 +67,6 @@ pub fn export_nf_workflow(wf_path: Option<&PathBuf>, source: &DataFrame, twome: 
     let mut all_files: Vec<FileManifest> = Vec::new();
 
     for idx in 0..source.height() {
-
         let single_row = source.get(idx);
         if single_row.is_some() {
             let unwrapped_row = single_row.unwrap();
@@ -87,10 +84,10 @@ pub fn export_nf_workflow(wf_path: Option<&PathBuf>, source: &DataFrame, twome: 
 
             all_files.extend(vehicle.files.clone());
 
-            manifest.payload.push(Epi2MeContent::Epi2meWf(vehicle) );
-            manifest.filecount += u64::try_from(filecount).unwrap(); 
-            manifest.files_size += filesize;  
-        }   
+            manifest.payload.push(Epi2MeContent::Epi2meWf(vehicle));
+            manifest.filecount += u64::try_from(filecount).unwrap();
+            manifest.files_size += filesize;
+        }
     }
 
     println!("{}", manifest.to_string());
@@ -101,9 +98,9 @@ pub fn export_nf_workflow(wf_path: Option<&PathBuf>, source: &DataFrame, twome: 
     manifest.write(&manifest_pb);
 
     let dest = PathBuf::from(twome.clone().unwrap());
-    /* 
+    /*
     // as per https://github.com/sagrudd/epi4you/issues/1 - ensure that destination is not in source
-    
+
     let common_prefix = &dest.strip_prefix(&current_prefix);
     if !common_prefix.is_err() {
         eprintln!("Destination is a child of source - this will not work!");
@@ -114,7 +111,12 @@ pub fn export_nf_workflow(wf_path: Option<&PathBuf>, source: &DataFrame, twome: 
         eprintln!("destination archive already exists - cannot continue without `--force`")
     } else {
         // tar up the contents specified in the manifest
-        epi2me_tar::tar(wf_path, dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
+        epi2me_tar::tar(
+            wf_path,
+            dest,
+            &all_files,
+            &get_relative_path(&manifest_pb, &local_prefix),
+        );
     }
 
     // cleanup temporary content ...
@@ -124,50 +126,57 @@ pub fn export_nf_workflow(wf_path: Option<&PathBuf>, source: &DataFrame, twome: 
     }
 }
 
-
-
-pub fn export_cli_run(ulidstr: &String, source: PathBuf, temp_dir: TempDir, dest: PathBuf, nextflow_stdout: &String, timestamp: &String, force: &bool) {
+pub fn export_cli_run(
+    ulidstr: &String,
+    source: PathBuf,
+    temp_dir: TempDir,
+    dest: PathBuf,
+    nextflow_stdout: &String,
+    timestamp: &String,
+    force: &bool,
+) {
     let epi2db = epi2me_db::find_db();
     let mut local_prefix = PathBuf::from("/");
     if epi2db.is_some() {
         local_prefix = epi2db.unwrap().epi2path;
     }
-    
+
     let mut manifest = Epi2MeManifest::new(temp_dir.path.clone());
     let mut all_files: Vec<FileManifest> = Vec::new();
 
     log::info!("packing [{:?}] into .2me format archive", &source.clone());
-    
+
     let mut vehicle = Epi2meDesktopAnalysis::init(ulidstr, &source, nextflow_stdout, timestamp);
 
     /* we need to parse some information here - at least the tuple of user//repo */
 
+    manifest.note_packaged_analysis(
+        &vec![
+            String::from(&vehicle.workflowUser),
+            String::from(&vehicle.workflowRepo),
+            String::from(&vehicle.name),
+        ]
+        .join("/"),
+    );
 
-        manifest.note_packaged_analysis(
-            &vec![String::from(&vehicle.workflowUser), 
-                String::from(&vehicle.workflowRepo), String::from(&vehicle.name)].join("/"));
+    // as per https://github.com/sagrudd/epi4you/issues/1 - ensure that destination is not in source
+    let common_prefix = &dest.strip_prefix(&source);
+    if !common_prefix.is_err() {
+        eprintln!("Destination is a child of source - this will not work!");
+        return;
+    }
 
-        // as per https://github.com/sagrudd/epi4you/issues/1 - ensure that destination is not in source
-        let common_prefix = &dest.strip_prefix(&source);
-        if !common_prefix.is_err() {
-            eprintln!("Destination is a child of source - this will not work!");
-            return;
-        }
+    vehicle.fish_files(&source, &local_prefix);
 
-        
-        vehicle.fish_files(&source, &local_prefix);
-       
-        all_files.extend(vehicle.get_files());
-        manifest.filecount += u64::try_from(vehicle.get_files().len()).unwrap();
-        manifest.files_size += &vehicle.get_files_size();
-        manifest.payload.push( Epi2MeContent::Epi2mePayload(vehicle.clone()) );    
+    all_files.extend(vehicle.get_files());
+    manifest.filecount += u64::try_from(vehicle.get_files().len()).unwrap();
+    manifest.files_size += &vehicle.get_files_size();
+    manifest
+        .payload
+        .push(Epi2MeContent::Epi2mePayload(vehicle.clone()));
 
+    println!("{:?}", &manifest);
 
-        println!("{:?}", &manifest);
-    
-
-
-    
     let mut manifest_pb = PathBuf::from(&temp_dir.path);
     manifest_pb.push(MANIFEST_JSON);
     manifest.write(&manifest_pb);
@@ -177,14 +186,22 @@ pub fn export_cli_run(ulidstr: &String, source: PathBuf, temp_dir: TempDir, dest
         eprintln!("destination archive already exists - cannot continue without `--force`")
     } else {
         // tar up the contents specified in the manifest
-        epi2me_tar::tar(None, dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
+        epi2me_tar::tar(
+            None,
+            dest,
+            &all_files,
+            &get_relative_path(&manifest_pb, &local_prefix),
+        );
     }
-
 }
 
-
-
-pub fn export_desktop_run(wf_path: Option<&PathBuf>, runids: &Vec<String>, polardb: &DataFrame, destination: Option<PathBuf>, bundlewfs: &Vec<Epi2meWorkflow>) {
+pub fn export_desktop_run(
+    wf_path: Option<&PathBuf>,
+    runids: &Vec<String>,
+    polardb: &DataFrame,
+    destination: Option<PathBuf>,
+    bundlewfs: &Vec<Epi2meWorkflow>,
+) {
     let local_prefix = epi2me_db::find_db().unwrap().epi2path;
     if destination.is_none() {
         eprintln!("error with tarball destination ....");
@@ -198,7 +215,7 @@ pub fn export_desktop_run(wf_path: Option<&PathBuf>, runids: &Vec<String>, polar
     }
     let temp_dir = tempdir.ok().unwrap();
     println!("using tempdir at [{}]", &temp_dir);
-    let mut manifest = Epi2MeManifest::new(temp_dir.path.clone()); 
+    let mut manifest = Epi2MeManifest::new(temp_dir.path.clone());
     let mut all_files: Vec<FileManifest> = Vec::new();
 
     for runid in runids {
@@ -209,28 +226,30 @@ pub fn export_desktop_run(wf_path: Option<&PathBuf>, runids: &Vec<String>, polar
             println!("packing [{:?}] into .2me format archive", &source.clone());
             let mut vehicle = Epi2meDesktopAnalysis::from_run_id(runid, polardb);
 
-    
+            // add some additional comments to the manifest as to what is happening at this moment ...
+            //vehicle.
+            manifest.note_packaged_analysis(
+                &vec![
+                    String::from(&vehicle.workflowUser),
+                    String::from(&vehicle.workflowRepo),
+                    String::from(&vehicle.name),
+                ]
+                .join("/"),
+            );
 
-                // add some additional comments to the manifest as to what is happening at this moment ...
-                //vehicle.
-                manifest.note_packaged_analysis(
-                    &vec![String::from(&vehicle.workflowUser), 
-                        String::from(&vehicle.workflowRepo), String::from(&vehicle.name)].join("/"));
+            // as per https://github.com/sagrudd/epi4you/issues/1 - ensure that destination is not in source
+            let common_prefix = &dest.strip_prefix(&source);
+            if !common_prefix.is_err() {
+                eprintln!("Destination is a child of source - this will not work!");
+                return;
+            }
 
-                // as per https://github.com/sagrudd/epi4you/issues/1 - ensure that destination is not in source
-                let common_prefix = &dest.strip_prefix(&source);
-                if !common_prefix.is_err() {
-                    eprintln!("Destination is a child of source - this will not work!");
-                    return;
-                }
+            vehicle.fish_files(&source, &local_prefix);
+            all_files.extend(vehicle.files.clone());
 
-                vehicle.fish_files(&source, &local_prefix);
-                all_files.extend(vehicle.files.clone());
-    
-                manifest.filecount += u64::try_from(vehicle.get_files().len()).unwrap();
-                manifest.files_size += &vehicle.get_files_size();
-                manifest.payload.push( Epi2MeContent::Epi2mePayload(vehicle) );
-            
+            manifest.filecount += u64::try_from(vehicle.get_files().len()).unwrap();
+            manifest.files_size += &vehicle.get_files_size();
+            manifest.payload.push(Epi2MeContent::Epi2mePayload(vehicle));
         }
     }
 
@@ -241,24 +260,30 @@ pub fn export_desktop_run(wf_path: Option<&PathBuf>, runids: &Vec<String>, polar
 
             let wf_vehicle = Epi2meWorkflow::path_init(wf_path, &wf.project, &wf.name, &wf.version);
             manifest.note_packaged_workflow(
-                &vec![String::from(&wf.project), 
-                    String::from( &wf.name), String::from(&wf.version)].join("/"));
+                &vec![
+                    String::from(&wf.project),
+                    String::from(&wf.name),
+                    String::from(&wf.version),
+                ]
+                .join("/"),
+            );
             // println!("{:?}", wf_vehicle);
             all_files.extend(wf_vehicle.files.clone());
             manifest.filecount += u64::try_from(wf_vehicle.get_files().len()).unwrap();
             manifest.files_size += wf_vehicle.get_files_size();
-            manifest.payload.push( Epi2MeContent::Epi2meWf(wf_vehicle) );     
+            manifest.payload.push(Epi2MeContent::Epi2meWf(wf_vehicle));
         }
     }
 
-    
     let mut manifest_pb = PathBuf::from(&temp_dir.path);
     manifest_pb.push(MANIFEST_JSON);
     manifest.write(&manifest_pb);
 
     // tar up the contents specified in the manifest
-    epi2me_tar::tar(wf_path, dest, &all_files, &get_relative_path(&manifest_pb, &local_prefix));
+    epi2me_tar::tar(
+        wf_path,
+        dest,
+        &all_files,
+        &get_relative_path(&manifest_pb, &local_prefix),
+    );
 }
-
-
-

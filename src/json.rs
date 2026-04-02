@@ -1,8 +1,7 @@
-use std::path::PathBuf;
-use std::fs::File;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
-
+use std::fs::File;
+use std::path::PathBuf;
 
 extern crate serde;
 
@@ -22,12 +21,12 @@ pub fn config_json(path_buf: &PathBuf) -> String {
 
     let epi2me_setup: SomeDataType =
         serde_json::from_reader(json_file).expect("error while reading json");
-    
+
     println!("\tjson parsed [workDir={}]", epi2me_setup.workingDirectory);
     return epi2me_setup.workingDirectory;
 }
 
-/* 
+/*
 
 pub fn write_manifest_str(manifest: &Epi2MeManifest, destination: &PathBuf) {
     println!("writing manifest to path [{:?}]", destination);

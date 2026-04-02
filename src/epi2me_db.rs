@@ -1,13 +1,15 @@
-use std::{path::{PathBuf, Path}, fs::{self}, env};
+use crate::{app_db, bundle, epi2me_workflow::Epi2meWorkflow, json, xworkflows};
 use home;
 use path_clean::PathClean;
 use polars_core::frame::DataFrame;
-use serde::{Serialize, Deserialize};
-use crate::{app_db, bundle, epi2me_workflow::Epi2meWorkflow, json, xworkflows};
+use serde::{Deserialize, Serialize};
+use std::{
+    env,
+    fs::{self},
+    path::{Path, PathBuf},
+};
 
-
-#[derive(Serialize, Deserialize, Clone)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Epi2meSetup {
     pub epi2path: PathBuf,
     pub epi2db_path: PathBuf,
@@ -17,23 +19,22 @@ pub struct Epi2meSetup {
     pub arch: String,
 }
 
-
 pub fn find_db() -> Option<Epi2meSetup> {
     println!("locating the EPI2ME app.db");
 
     let home_dir = home::home_dir();
     if home_dir.is_some() {
-
         let mut path: Option<PathBuf> = None;
 
         /* There is a sequence through which the working directory should be sought - presence of a config file should be considered first
         - if there is no config file the location of the default $HOME/epi2melabs should also be allowed?
          */
 
-        let macos = check_os_specific_db_path(&home_dir, "Library/Application Support/EPI2ME/config.json");
+        let macos =
+            check_os_specific_db_path(&home_dir, "Library/Application Support/EPI2ME/config.json");
         let linux = check_os_specific_db_path(&home_dir, ".config/EPI2ME/config.json");
         let default: Option<PathBuf> = check_os_specific_db_path(&home_dir, "epi2melabs");
-        
+
         if macos.is_some() {
             path = macos;
         } else if linux.is_some() {
@@ -50,7 +51,6 @@ pub fn find_db() -> Option<Epi2meSetup> {
             let for_you_dir: Option<PathBuf> = get_4you_path(&path.clone().unwrap());
 
             if db_path.is_some() && wf_dir.is_some() {
-
                 let vehicle = Epi2meSetup {
                     epi2path: path.unwrap(),
                     epi2db_path: PathBuf::from(&db_path.unwrap()),
@@ -67,8 +67,6 @@ pub fn find_db() -> Option<Epi2meSetup> {
     eprintln!("Unable to locate the EPI2ME application database ...");
     return None;
 }
-
-
 
 fn get_4you_path(app_db_path: &PathBuf) -> Option<PathBuf> {
     let mut x = app_db_path.clone();
@@ -87,7 +85,6 @@ fn get_4you_path(app_db_path: &PathBuf) -> Option<PathBuf> {
     }
     return None;
 }
-
 
 fn check_os_specific_db_path(home: &Option<PathBuf>, os_specific_path: &str) -> Option<PathBuf> {
     let mut pb = home.clone().unwrap();
@@ -121,20 +118,28 @@ fn get_appdb_path(app_db_path: &PathBuf) -> Option<PathBuf> {
     return None;
 }
 
-pub fn epi2me_manager(epi2me: &Epi2meSetup, df: &DataFrame, list: &bool, runids: &Vec<String>, twome: &Option<String>, force: &bool, bundlewf: &bool) {
-    println!("epi2me.list == {}",*list);
+pub fn epi2me_manager(
+    epi2me: &Epi2meSetup,
+    df: &DataFrame,
+    list: &bool,
+    runids: &Vec<String>,
+    twome: &Option<String>,
+    force: &bool,
+    bundlewf: &bool,
+) {
+    println!("epi2me.list == {}", *list);
     if *list {
         app_db::print_appdb(&df);
         return;
-    } 
+    }
     if runids.len() == 0 {
         println!("EPI2ME analysis twome archiving requires a --runid identifier (name or id)");
         return;
-    } 
+    }
     if twome.is_none() {
         println!("EPI2ME twome archiving requires a --twome <file> target to writing to");
-        return; 
-    } 
+        return;
+    }
     let pb = PathBuf::from(twome.as_ref().unwrap());
     if pb.exists() {
         if pb.is_file() && !force {
@@ -143,8 +148,8 @@ pub fn epi2me_manager(epi2me: &Epi2meSetup, df: &DataFrame, list: &bool, runids:
         } else if pb.is_dir() {
             println!("twome file is a directory - file is required");
             return;
-        } 
-    }  
+        }
+    }
     // let's iterate through the provided runids
     for runid in runids {
         if !app_db::validate_db_entry(&runid, &df) {
@@ -161,13 +166,14 @@ pub fn epi2me_manager(epi2me: &Epi2meSetup, df: &DataFrame, list: &bool, runids:
         if bundlewf == &true {
             // ensure that a workflow for bundling is intact ...
             let wf = app_db::validate_qualified_analysis_workflow(
-                &runid_str.to_string(), 
-                &polardb, &epi2me.epi2path,
+                &runid_str.to_string(),
+                &polardb,
+                &epi2me.epi2path,
             );
             if wf.is_none() {
                 eprintln!("This workflow may be an orphan - cannot continue");
                 return;
-            } 
+            }
 
             // do we need to add this wf to the vector of wfs?
             let wwf = wf.unwrap();
@@ -182,7 +188,6 @@ pub fn epi2me_manager(epi2me: &Epi2meSetup, df: &DataFrame, list: &bool, runids:
                 bundle_wfs.push(wwf);
             }
         }
-
     }
 
     // if we are here we have a destination and a unique runid - let's sanity check the destination PATH
@@ -198,8 +203,6 @@ pub fn epi2me_manager(epi2me: &Epi2meSetup, df: &DataFrame, list: &bool, runids:
     println!("tar .2me archive to be written to [{:?}]", absolute_path);
 
     // we have a destination and a unique runid - let's package something ...
-    
-    bundle::export_desktop_run(None, runids, df, Some(absolute_path), &bundle_wfs);
 
-    
+    bundle::export_desktop_run(None, runids, df, Some(absolute_path), &bundle_wfs);
 }

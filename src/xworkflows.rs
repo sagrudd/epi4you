@@ -1,11 +1,9 @@
-use std::{fs, path::PathBuf};
-use glob::glob;
-use serde::{Serialize, Deserialize};
 use crate::{epi2me_db::Epi2meSetup, xnf_parser};
+use glob::glob;
+use serde::{Deserialize, Serialize};
+use std::{fs, path::PathBuf};
 
-
-#[derive(Serialize, Deserialize, Clone)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Workflow {
     pub project: String,
     pub name: String,
@@ -38,7 +36,6 @@ impl Epi2meWorkflow {
         for entry in glob(&path_pattern).expect("Failed to read glob pattern") {
             match entry {
                 Ok(mut globpath) => {
-                    
                     let mut config_path = globpath.clone();
                     config_path.push("nextflow.config");
                     let globpathstr = globpath.as_os_str().to_str().unwrap();
@@ -46,7 +43,7 @@ impl Epi2meWorkflow {
                         let workflow = globpath.file_name().unwrap().to_str().unwrap().to_string();
                         globpath.pop();
                         let project = globpath.file_name().unwrap().to_str().unwrap().to_string();
-    
+
                         // extract workflow revision for the linked artifact
                         // this is probably best prepared by parsing the information from the config file?
                         if config_path.exists() {
@@ -57,17 +54,16 @@ impl Epi2meWorkflow {
                             if man_version.is_some() {
                                 version = String::from(man_version.unwrap());
                             }
-    
-                            let w = Workflow{
+
+                            let w = Workflow {
                                 project: project,
                                 name: workflow,
                                 version: String::from(version),
                             };
                             self.workflows.push(w);
-    
                         }
                     }
-                },
+                }
                 Err(e) => println!("{:?}", e),
             }
         }
@@ -112,31 +108,27 @@ impl Epi2meWorkflow {
     }
 
     pub fn glob_path_by_wfname(&self, project: &String, name: &String) -> Option<PathBuf> {
-
         let mut src = PathBuf::from(self.epi2me.clone().unwrap().epi2wf_dir);
         src.push(&project);
-    
+
         let globpat = src.into_os_string().into_string().unwrap();
         let result = [&globpat, "/*", &name].join("");
-        
-        let gdata =  glob(&result).expect("Failed to read glob pattern");
+
+        let gdata = glob(&result).expect("Failed to read glob pattern");
         for entry in gdata {
             if entry.is_ok() {
                 let entry_item = entry.unwrap();
                 // ensure that the folder found is actually a nextflow folder (nanopore flavoured)
                 if self.is_folder_wf_compliant(&entry_item) {
                     // println!("folder picked == {:?}", entry_item);
-                    return Some(entry_item)
+                    return Some(entry_item);
                 }
             }
         }
         // we can also assess whether project is a link to e.g. a nextflow based folder elsewhere on CLI
         return None;
     }
-
-
 }
-
 
 pub fn get_epi2me_wfdir_path(app_db_path: &PathBuf) -> Option<PathBuf> {
     let mut x = app_db_path.clone();
