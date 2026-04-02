@@ -63,5 +63,11 @@ The repository includes a GitHub Actions workflow that:
 * collects ``docs/build/html``, and
 * deploys that artifact to GitHub Pages.
 
+The workflow asks ``actions/configure-pages`` to enable Pages automatically on
+first deployment. That avoids the common failure where the repository does not
+yet have a Pages site configured.
+
 You may still need to enable Pages in the repository settings so GitHub treats
-``GitHub Actions`` as the publication source for the site.
+``GitHub Actions`` as the publication source for the site, especially if the
+repository belongs to an organisation with restricted Pages or Actions
+policies.
